@@ -25,8 +25,8 @@ Create a PostgreSQL database, set `DATABASE_URL`, then apply `server/drizzle/000
 ```bash
 cd client
 flutter pub get
-flutter pub run build_runner build --delete-conflicting-outputs
-flutter run --dart-define=API_BASE_URL=http://localhost:8787
+dart run build_runner build
+flutter run -d chrome --web-hostname localhost --web-port 3000 --dart-define=API_BASE_URL=http://localhost:8787/v1
 ```
 
 The app can be explored offline without an account; server-backed actions require the API.
@@ -40,4 +40,3 @@ The app can be explored offline without an account; server-backed actions requir
 - Refresh tokens and verification/reset tokens are stored as SHA-256 hashes.
 
 Production deployments must use HTTPS, secure secrets, a real Resend/FCM configuration, and database migrations.
-

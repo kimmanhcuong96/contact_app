@@ -13,16 +13,25 @@ class SyncService {
 
   void start() {
     unawaited(_syncIfEnabled());
-    _subscription ??= Connectivity().onConnectivityChanged.listen((results) async {
+    _subscription ??=
+        Connectivity().onConnectivityChanged.listen((results) async {
       if (!results.contains(ConnectivityResult.none)) await _syncIfEnabled();
     });
   }
-  Future<void> syncNow() async { await profiles.sync(); await connections.sync(); }
+
+  Future<void> syncNow() async {
+    await profiles.sync();
+    await connections.sync();
+  }
+
   Future<void> _syncIfEnabled() async {
     try {
-      final setting = await (database.select(database.appSettings)..where((row) => row.key.equals('autoSync'))).getSingleOrNull();
+      final setting = await (database.select(database.appSettings)
+            ..where((row) => row.key.equals('autoSync')))
+          .getSingleOrNull();
       if (setting?.value != 'false') await syncNow();
-    } catch (_) { /* Offline and authentication failures remain queued. */ }
+    } catch (_) {/* Offline and authentication failures remain queued. */}
   }
+
   Future<void> dispose() async => _subscription?.cancel();
 }

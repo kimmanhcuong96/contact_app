@@ -12,32 +12,77 @@ import '../models/sharing_profile.dart';
 import 'sync/sync_service.dart';
 import 'notifications/notification_registration_service.dart';
 
-const secureStorageProvider = Provider((ref) => const FlutterSecureStorage());
-final databaseProvider = Provider((ref) { final value = AppDatabase(); ref.onDispose(value.close); return value; });
-final apiClientProvider = Provider((ref) => ApiClient(ref.watch(secureStorageProvider)));
-final cryptoProvider = Provider((ref) => CryptoService(ref.watch(secureStorageProvider)));
-final authRepositoryProvider = Provider((ref) => AuthRepository(ref.watch(apiClientProvider), ref.watch(cryptoProvider)));
-final profileRepositoryProvider = Provider((ref) => ProfileRepository(ref.watch(databaseProvider), ref.watch(apiClientProvider), ref.watch(cryptoProvider)));
-final connectionRepositoryProvider = Provider((ref) => ConnectionRepository(ref.watch(databaseProvider), ref.watch(apiClientProvider), ref.watch(cryptoProvider)));
-final syncServiceProvider = Provider((ref) { final value = SyncService(ref.watch(profileRepositoryProvider), ref.watch(connectionRepositoryProvider), ref.watch(databaseProvider))..start(); ref.onDispose(value.dispose); return value; });
-final notificationRegistrationProvider = Provider((ref) { final value = NotificationRegistrationService(ref.watch(apiClientProvider))..start(); ref.onDispose(value.dispose); return value; });
+final secureStorageProvider = Provider((ref) => const FlutterSecureStorage());
+final databaseProvider = Provider((ref) {
+  final value = AppDatabase();
+  ref.onDispose(value.close);
+  return value;
+});
+final apiClientProvider =
+    Provider((ref) => ApiClient(ref.watch(secureStorageProvider)));
+final cryptoProvider =
+    Provider((ref) => CryptoService(ref.watch(secureStorageProvider)));
+final authRepositoryProvider = Provider((ref) =>
+    AuthRepository(ref.watch(apiClientProvider), ref.watch(cryptoProvider)));
+final profileRepositoryProvider = Provider((ref) => ProfileRepository(
+    ref.watch(databaseProvider),
+    ref.watch(apiClientProvider),
+    ref.watch(cryptoProvider)));
+final connectionRepositoryProvider = Provider((ref) => ConnectionRepository(
+    ref.watch(databaseProvider),
+    ref.watch(apiClientProvider),
+    ref.watch(cryptoProvider)));
+final syncServiceProvider = Provider((ref) {
+  final value = SyncService(ref.watch(profileRepositoryProvider),
+      ref.watch(connectionRepositoryProvider), ref.watch(databaseProvider))
+    ..start();
+  ref.onDispose(value.dispose);
+  return value;
+});
+final notificationRegistrationProvider = Provider((ref) {
+  final value = NotificationRegistrationService(ref.watch(apiClientProvider))
+    ..start();
+  ref.onDispose(value.dispose);
+  return value;
+});
 
-final masterProfileProvider = StreamProvider<MasterProfile>((ref) => ref.watch(profileRepositoryProvider).watchMaster());
-final sharingProfilesProvider = StreamProvider<List<SharingProfile>>((ref) => ref.watch(profileRepositoryProvider).watchSharing());
-final connectionsProvider = StreamProvider((ref) => ref.watch(connectionRepositoryProvider).watchConnections());
+final masterProfileProvider = StreamProvider<MasterProfile>(
+    (ref) => ref.watch(profileRepositoryProvider).watchMaster());
+final sharingProfilesProvider = StreamProvider<List<SharingProfile>>(
+    (ref) => ref.watch(profileRepositoryProvider).watchSharing());
+final connectionsProvider = StreamProvider(
+    (ref) => ref.watch(connectionRepositoryProvider).watchConnections());
 final themeModeProvider = FutureProvider<ThemeMode>((ref) async {
   final database = ref.watch(databaseProvider);
-  final row = await (database.select(database.appSettings)..where((item) => item.key.equals('theme'))).getSingleOrNull();
-  return switch (row?.value) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.system };
+  final row = await (database.select(database.appSettings)
+        ..where((item) => item.key.equals('theme')))
+      .getSingleOrNull();
+  return switch (row?.value) {
+    'light' => ThemeMode.light,
+    'dark' => ThemeMode.dark,
+    _ => ThemeMode.system
+  };
 });
 
 class SessionController extends AsyncNotifier<bool> {
-  @override Future<bool> build() => ref.read(apiClientProvider).hasSession;
+  @override
+  Future<bool> build() => ref.read(apiClientProvider).hasSession;
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async { await ref.read(authRepositoryProvider).login(email, password); await ref.read(profileRepositoryProvider).initializeDefaults(); return true; });
+    state = await AsyncValue.guard(() async {
+      await ref.read(authRepositoryProvider).login(email, password);
+      await ref.read(profileRepositoryProvider).initializeDefaults();
+      return true;
+    });
   }
-  Future<Map<String, dynamic>> register(String email, String password) => ref.read(authRepositoryProvider).register(email, password);
-  Future<void> logout() async { await ref.read(authRepositoryProvider).logout(); state = const AsyncData(false); }
+
+  Future<Map<String, dynamic>> register(String email, String password) =>
+      ref.read(authRepositoryProvider).register(email, password);
+  Future<void> logout() async {
+    await ref.read(authRepositoryProvider).logout();
+    state = const AsyncData(false);
+  }
 }
-final sessionProvider = AsyncNotifierProvider<SessionController, bool>(SessionController.new);
+
+final sessionProvider =
+    AsyncNotifierProvider<SessionController, bool>(SessionController.new);

@@ -30,10 +30,23 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 class NexBookApp extends ConsumerWidget {
   const NexBookApp({super.key});
-  @override Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
-    title: 'NexBook', debugShowCheckedModeBanner: false, routerConfig: ref.watch(routerProvider),
-    theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff315cfd), brightness: Brightness.light), useMaterial3: true, inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder())),
-    darkTheme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff8ea5ff), brightness: Brightness.dark), useMaterial3: true),
-    themeMode: ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system,
-  );
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
+        title: 'NexBook',
+        debugShowCheckedModeBanner: false,
+        routerConfig: ref.watch(routerProvider),
+        theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xff315cfd),
+                brightness: Brightness.light),
+            useMaterial3: true,
+            inputDecorationTheme:
+                const InputDecorationTheme(border: OutlineInputBorder())),
+        darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xff8ea5ff),
+                brightness: Brightness.dark),
+            useMaterial3: true),
+        themeMode: ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system,
+      );
 }

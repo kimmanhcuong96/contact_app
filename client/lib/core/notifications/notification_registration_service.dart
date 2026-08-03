@@ -14,7 +14,8 @@ class NotificationRegistrationService {
       await Firebase.initializeApp();
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);
-      final token = await messaging.getToken(vapidKey: const String.fromEnvironment('FCM_VAPID_KEY'));
+      final token = await messaging.getToken(
+          vapidKey: const String.fromEnvironment('FCM_VAPID_KEY'));
       if (token != null) await _register(token);
       _subscription = messaging.onTokenRefresh.listen(_register);
     } catch (_) {
@@ -23,8 +24,15 @@ class NotificationRegistrationService {
   }
 
   Future<void> _register(String token) async {
-    final platform = kIsWeb ? 'web' : switch (defaultTargetPlatform) { TargetPlatform.iOS => 'ios', _ => 'android' };
-    await api.dio.post<void>('/devices', data: {'token': token, 'platform': platform});
+    final platform = kIsWeb
+        ? 'web'
+        : switch (defaultTargetPlatform) {
+            TargetPlatform.iOS => 'ios',
+            _ => 'android'
+          };
+    await api.dio
+        .post<void>('/devices', data: {'token': token, 'platform': platform});
   }
+
   Future<void> dispose() async => _subscription?.cancel();
 }

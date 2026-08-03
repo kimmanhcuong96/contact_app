@@ -2,18 +2,15 @@
 
 The client owns all profile content and cryptographic keys. Drift is the offline source of truth; online synchronization uploads only AES-256-GCM envelopes.
 
-## Bootstrap platform folders
-
-This repository keeps application source concise. On a machine with Flutter Stable installed, generate the standard platform runners once:
+## Run the web app
 
 ```bash
-flutter create --platforms=android,ios,web --org app.nexbook .
 flutter pub get
-dart run build_runner build --delete-conflicting-outputs
-flutter run --dart-define=API_BASE_URL=http://localhost:8787/v1
+dart run build_runner build
+flutter run -d chrome --web-hostname localhost --web-port 3000 --dart-define=API_BASE_URL=http://localhost:8787/v1
 ```
 
-`flutter create` preserves existing `lib/` source and `pubspec.yaml`. For production, configure Android/iOS secure-storage entitlements, camera permission text, Firebase messaging, HTTPS API URL, and Flutter web's Drift WASM assets according to the selected Drift release.
+The web runner and PWA manifest are committed under `web/`. For production, configure Firebase messaging, an HTTPS API URL, and the web VAPID key. Android/iOS runner folders can be generated later without blocking web development.
 
 ## Key model
 
@@ -23,4 +20,3 @@ flutter run --dart-define=API_BASE_URL=http://localhost:8787/v1
 - Connections carry only the wrapped key; the server cannot unwrap or decrypt profile views.
 
 Multiple-device recovery requires importing a trusted encrypted key backup; it is deliberately not silently copied by the server.
-
