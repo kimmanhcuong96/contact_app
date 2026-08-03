@@ -47,7 +47,14 @@ class AppSettings extends Table {
 @DriftDatabase(
     tables: [MasterProfiles, SharingProfiles, ConnectedProfiles, AppSettings])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(driftDatabase(name: 'nexbook'));
+  AppDatabase()
+      : super(driftDatabase(
+          name: 'nexbook',
+          web: DriftWebOptions(
+            sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+            driftWorker: Uri.parse('drift_worker.js'),
+          ),
+        ));
   @override
   int get schemaVersion => 1;
 
