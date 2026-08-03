@@ -1,0 +1,10 @@
+name = "nexbook-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_ORIGIN = "http://localhost:3000"
+ACCESS_TOKEN_TTL_SECONDS = "900"
+REFRESH_TOKEN_TTL_DAYS = "30"
+

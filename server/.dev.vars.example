@@ -1,0 +1,8 @@
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+JWT_SECRET=replace-with-at-least-32-random-characters
+RESEND_API_KEY=
+EMAIL_FROM=NexBook <noreply@example.com>
+FCM_PROJECT_ID=
+FCM_CLIENT_EMAIL=
+FCM_PRIVATE_KEY=
+

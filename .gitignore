@@ -1,0 +1,14 @@
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+coverage/
+node_modules/
+.wrangler/
+.dev.vars
+*.log
+*.g.dart
+*.freezed.dart
+client/android/local.properties
+client/ios/Pods/
+

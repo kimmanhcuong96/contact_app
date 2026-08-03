@@ -1,0 +1,85 @@
+import { ConnectionRepository } from '../repositories/connection-repository';
+import { ProfileRepository } from '../repositories/profile-repository';
+import { HttpError } from '../utils/http-error';
+import { NotificationService } from './notification-service';
+
+export class ConnectionService {
+  constructor(private repo: ConnectionRepository, private profiles: ProfileRepository, private notifications: NotificationService) {}
+
+  async list(userId: string) {
+    const rows = await this.repo.list(userId);
+    return Promise.all(rows.map(async (row) => {
+      const outgoing = row.requesterId === userId;
+      const sharedSetId = outgoing ? row.addresseeProfileSetId : row.requesterProfileSetId;
+      const sharedSet = row.status === 'connected' && sharedSetId ? await this.profiles.findById(sharedSetId) : undefined;
+      return {
+        id: row.id,
+        peerUserId: outgoing ? row.addresseeId : row.requesterId,
+        direction: outgoing ? 'outgoing' : 'incoming',
+        status: row.status,
+        assignedProfileSetId: outgoing ? row.requesterProfileSetId : row.addresseeProfileSetId,
+        keyEnvelope: outgoing ? row.addresseeKeyEnvelope : row.requesterKeyEnvelope,
+        profile: sharedSet ? { encryptedBlob: sharedSet.encryptedBlob, version: sharedSet.version, updatedAt: sharedSet.updatedAt } : null,
+        updatedAt: row.updatedAt,
+      };
+    }));
+  }
+
+  async request(userId: string, peerUserId: string, profileSetId: string, keyEnvelope: unknown) {
+    if (userId === peerUserId) throw new HttpError(400, 'Cannot connect to yourself', 'invalid_peer');
+    if (!(await this.repo.findUserKey(peerUserId))) throw new HttpError(404, 'User not found', 'not_found');
+    await this.assertProfileOwner(profileSetId, userId);
+    if (await this.repo.findPair(userId, peerUserId)) throw new HttpError(409, 'A connection already exists', 'connection_exists');
+    const connection = await this.repo.create(userId, peerUserId, profileSetId, keyEnvelope);
+    await this.notifications.send([peerUserId], 'connection_request', { connectionId: connection.id, requesterId: userId });
+    return connection;
+  }
+
+  async update(userId: string, id: string, action: string, profileSetId?: string, keyEnvelope?: unknown) {
+    const row = await this.owned(userId, id);
+    if (action === 'accept') {
+      if (row.addresseeId !== userId || row.status !== 'pending' || !profileSetId || !keyEnvelope) throw new HttpError(400, 'This request cannot be accepted', 'invalid_state');
+      await this.assertProfileOwner(profileSetId, userId);
+      const updated = await this.repo.update(id, { status: 'connected', addresseeProfileSetId: profileSetId, addresseeKeyEnvelope: keyEnvelope });
+      await this.notifications.send([row.requesterId], 'connection_accepted', { connectionId: id });
+      return updated;
+    }
+    if (action === 'reject' || action === 'cancel') {
+      if (row.status !== 'pending') throw new HttpError(400, 'Only pending requests can be removed', 'invalid_state');
+      if (action === 'cancel' && row.requesterId !== userId) throw new HttpError(403, 'Only requester can cancel', 'forbidden');
+      if (action === 'reject' && row.addresseeId !== userId) throw new HttpError(403, 'Only recipient can reject', 'forbidden');
+      await this.repo.delete(id);
+      return null;
+    }
+    if (action === 'disable' || action === 'enable') {
+      if (!['connected', 'disabled'].includes(row.status)) throw new HttpError(400, 'Invalid connection state', 'invalid_state');
+      return this.repo.update(id, { status: action === 'disable' ? 'disabled' : 'connected' });
+    }
+    if (action === 'assign') {
+      if (!profileSetId || !keyEnvelope || row.status !== 'connected') throw new HttpError(400, 'Profile set and key envelope are required', 'invalid_state');
+      await this.assertProfileOwner(profileSetId, userId);
+      const values = row.requesterId === userId
+        ? { requesterProfileSetId: profileSetId, requesterKeyEnvelope: keyEnvelope }
+        : { addresseeProfileSetId: profileSetId, addresseeKeyEnvelope: keyEnvelope };
+      const updated = await this.repo.update(id, values);
+      const peer = row.requesterId === userId ? row.addresseeId : row.requesterId;
+      await this.notifications.send([peer], 'sharing_profile_changed', { connectionId: id });
+      return updated;
+    }
+    throw new HttpError(400, 'Unsupported connection action', 'invalid_action');
+  }
+
+  async remove(userId: string, id: string) { await this.owned(userId, id); await this.repo.delete(id); }
+  registerDevice(userId: string, token: string, platform: string) { return this.repo.registerDevice(userId, token, platform); }
+  removeDevice(userId: string, token: string) { return this.repo.removeDevice(userId, token); }
+
+  private async owned(userId: string, id: string) {
+    const row = await this.repo.find(id);
+    if (!row) throw new HttpError(404, 'Connection not found', 'not_found');
+    if (row.requesterId !== userId && row.addresseeId !== userId) throw new HttpError(403, 'Not allowed', 'forbidden');
+    return row;
+  }
+  private async assertProfileOwner(id: string, userId: string) {
+    if (!(await this.repo.profileBelongsTo(id, userId))) throw new HttpError(400, 'Profile set does not belong to user', 'invalid_profile_set');
+  }
+}

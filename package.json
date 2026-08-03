@@ -1,0 +1,11 @@
+{
+  "name": "nexbook",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "api:dev": "pnpm --dir server dev",
+    "api:test": "pnpm --dir server test",
+    "api:check": "pnpm --dir server check"
+  }
+}
+
