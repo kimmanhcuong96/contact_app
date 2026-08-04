@@ -259,8 +259,10 @@ User settings include:
 
 * Theme
 * Language
-  * Defaults from device/browser locale: Vietnamese for `vi`/Vietnam,
-    Chinese for `zh`/China, Japanese for `ja`/Japan, and English otherwise
+  * Defaults from Cloudflare country (`VN`, `CN`, `JP`) and falls back to the
+    device/browser locale when offline
+  * Uses Vietnamese for Vietnam, Chinese for Chinese locales/regions,
+    Japanese for Japan, and English otherwise
   * Can be changed manually to English, Vietnamese, Chinese, or Japanese
 * Notification
 * Auto Sync

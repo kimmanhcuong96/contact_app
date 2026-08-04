@@ -71,15 +71,29 @@ final localeProvider = FutureProvider<Locale>((ref) async {
   final row = await (database.select(database.appSettings)
         ..where((item) => item.key.equals('language')))
       .getSingleOrNull();
-  final code = switch (row?.value) {
+  final savedCode = switch (row?.value) {
     'vi' || 'Vietnamese' || 'Tiếng Việt' => 'vi',
     'zh' || 'Chinese' || '中文' => 'zh',
     'ja' || 'Japanese' || '日本語' => 'ja',
     'en' || 'English' => 'en',
-    _ => detectDefaultLocale(WidgetsBinding.instance.platformDispatcher.locales)
-        .languageCode,
+    _ => null,
   };
-  return Locale(code);
+  if (savedCode != null) return Locale(savedCode);
+
+  String? country;
+  try {
+    final response = await ref
+        .read(apiClientProvider)
+        .dio
+        .get<Map<String, dynamic>>('/locale');
+    country = response.data?['country'] as String?;
+  } catch (_) {
+    // The device/browser locale is the offline fallback.
+  }
+  return detectDefaultLocale(
+    WidgetsBinding.instance.platformDispatcher.locales,
+    countryCode: country,
+  );
 });
 
 class SessionController extends AsyncNotifier<bool> {

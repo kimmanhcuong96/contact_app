@@ -106,7 +106,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: _chooseTheme),
         ListTile(
             title: Text(l10n.t('language')),
-            subtitle: Text(l10n.languageName(language)),
+            subtitle: Text(l10n.languageDisplayName(language)),
             trailing: const Icon(Icons.chevron_right),
             onTap: _chooseLanguage),
         const Divider(),
@@ -169,7 +169,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: ['en', 'vi', 'zh', 'ja']
                 .map((value) => SimpleDialogOption(
                     onPressed: () => Navigator.pop(context, value),
-                    child: Text(context.l10n.languageName(value))))
+                    child: Row(children: [
+                      Text(context.l10n.languageFlag(value),
+                          style: const TextStyle(fontSize: 24)),
+                      const SizedBox(width: 12),
+                      Text(context.l10n.languageName(value)),
+                    ])))
                 .toList()));
     if (value != null) {
       setState(() => language = value);

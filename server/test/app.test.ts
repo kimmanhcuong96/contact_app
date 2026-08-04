@@ -16,6 +16,12 @@ describe('HTTP boundary', () => {
     await expect(response.json()).resolves.toEqual({ status: 'ok' });
   });
 
+  it('exposes locale detection without authentication or a database call', async () => {
+    const response = await app.request('/v1/locale', {}, env);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ country: null });
+  });
+
   it('requires authentication for encrypted profile sets', async () => {
     const response = await app.request('/v1/profile-sets', {}, env);
     expect(response.status).toBe(401);

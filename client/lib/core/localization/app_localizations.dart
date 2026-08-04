@@ -30,7 +30,24 @@ class AppLocalizations {
 
   String profileField(String key) => t('field.$key');
   String themeName(String value) => t('theme.$value');
-  String languageName(String value) => t('language.$value');
+  String languageName(String value) =>
+      const {
+        'en': 'English',
+        'vi': 'Tiếng Việt',
+        'zh': '中文',
+        'ja': '日本語',
+      }[value] ??
+      value;
+  String languageFlag(String value) =>
+      const {
+        'en': '🇬🇧',
+        'vi': '🇻🇳',
+        'zh': '🇨🇳',
+        'ja': '🇯🇵',
+      }[value] ??
+      '🌐';
+  String languageDisplayName(String value) =>
+      '${languageFlag(value)}  ${languageName(value)}';
   String defaultProfileName(String value) => switch (value) {
         'Family' => t('defaultProfile.family'),
         'Friends' => t('defaultProfile.friends'),
@@ -40,7 +57,14 @@ class AppLocalizations {
       };
 }
 
-Locale detectDefaultLocale(List<Locale> preferredLocales) {
+Locale detectDefaultLocale(List<Locale> preferredLocales,
+    {String? countryCode}) {
+  final detectedCountry = countryCode?.toUpperCase();
+  if (detectedCountry == 'VN') return const Locale('vi');
+  if (const {'CN', 'TW', 'HK', 'MO'}.contains(detectedCountry)) {
+    return const Locale('zh');
+  }
+  if (detectedCountry == 'JP') return const Locale('ja');
   if (preferredLocales.isEmpty) return const Locale('en');
   final locale = preferredLocales.first;
   final language = locale.languageCode.toLowerCase();

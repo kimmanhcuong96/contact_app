@@ -21,6 +21,7 @@ app.use('*', rateLimit());
 app.use('/v1/*', async (c, next) => { c.set('db', createDatabase(c.env.DATABASE_URL)); await next(); });
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/v1/locale', (c) => c.json({ country: c.req.raw.cf?.country ?? null }));
 app.route('/v1/auth', authRoutes);
 app.use('/v1/profile-sets', requireAuth);
 app.use('/v1/profile-sets/*', requireAuth);

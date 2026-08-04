@@ -40,10 +40,23 @@ void main() {
     expect(detectDefaultLocale(const [Locale('zh', 'CN')]).languageCode, 'zh');
     expect(detectDefaultLocale(const [Locale('en', 'JP')]).languageCode, 'ja');
     expect(detectDefaultLocale(const [Locale('fr', 'FR')]).languageCode, 'en');
+    expect(
+      detectDefaultLocale(const [Locale('en', 'US')], countryCode: 'VN')
+          .languageCode,
+      'vi',
+    );
   });
 
   test('provides Chinese and Japanese translations', () {
     expect(AppLocalizations(const Locale('zh')).t('signIn'), '登录');
     expect(AppLocalizations(const Locale('ja')).t('signIn'), 'ログイン');
+  });
+
+  test('always displays native language names with flags', () {
+    final l10n = AppLocalizations(const Locale('ja'));
+    expect(l10n.languageDisplayName('en'), '🇬🇧  English');
+    expect(l10n.languageDisplayName('vi'), '🇻🇳  Tiếng Việt');
+    expect(l10n.languageDisplayName('zh'), '🇨🇳  中文');
+    expect(l10n.languageDisplayName('ja'), '🇯🇵  日本語');
   });
 }
