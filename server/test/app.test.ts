@@ -42,6 +42,9 @@ describe('HTTP boundary', () => {
       }),
     }, env);
     expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'validation_error', field: 'passwordConfirmation' },
+    });
   });
 
   it('rejects invalid usernames before accessing the database', async () => {
@@ -56,5 +59,8 @@ describe('HTTP boundary', () => {
       }),
     }, env);
     expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'validation_error', field: 'username' },
+    });
   });
 });

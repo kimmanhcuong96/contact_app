@@ -1,88 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/localization/app_localizations.dart';
+import '../../core/network/localized_error.dart';
 import '../../core/providers.dart';
 import '../../models/master_profile.dart';
 import '../../models/sharing_profile.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final master = ref.watch(masterProfileProvider);
     final sharing = ref.watch(sharingProfilesProvider);
     return Scaffold(
-        appBar: AppBar(title: const Text('My profile'), actions: [
+      appBar: AppBar(title: Text(l10n.t('myProfile')), actions: [
+        IconButton(
+            tooltip: l10n.t('syncNow'),
+            onPressed: () => _sync(context, ref),
+            icon: const Icon(Icons.sync))
+      ]),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        master.when(
+            data: (value) => Card(
+                child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(value.fields['fullName']?.isNotEmpty == true
+                        ? value.fields['fullName']!
+                        : l10n.t('addYourDetails')),
+                    subtitle: Text(
+                        l10n.t('fieldsSaved', {'count': value.fields.length})),
+                    trailing: const Icon(Icons.edit),
+                    onTap: () => _editMaster(context, ref, value))),
+            loading: () => const LinearProgressIndicator(),
+            error: (error, _) => Text(localizedError(l10n, error))),
+        const SizedBox(height: 20),
+        Row(children: [
+          Text(l10n.t('sharingProfiles'),
+              style: Theme.of(context).textTheme.titleLarge),
+          const Spacer(),
           IconButton(
-              tooltip: 'Sync now',
-              onPressed: () => _sync(context, ref),
-              icon: const Icon(Icons.sync))
+              onPressed: () => _editSharing(context, ref),
+              icon: const Icon(Icons.add))
         ]),
-        body: ListView(padding: const EdgeInsets.all(16), children: [
-          master.when(
-              data: (value) => Card(
-                  child: ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(value.fields['fullName']?.isNotEmpty == true
-                          ? value.fields['fullName']!
-                          : 'Add your details'),
-                      subtitle:
-                          Text('${value.fields.length} fields saved locally'),
-                      trailing: const Icon(Icons.edit),
-                      onTap: () => _editMaster(context, ref, value))),
-              loading: () => const LinearProgressIndicator(),
-              error: (error, _) => Text('$error')),
-          const SizedBox(height: 20),
-          Row(children: [
-            Text('Sharing profiles',
-                style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            IconButton(
-                onPressed: () => _editSharing(context, ref),
-                icon: const Icon(Icons.add))
-          ]),
-          Text(
-              'Each profile is encrypted independently. Only selected fields are included.',
-              style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 8),
-          sharing.when(
-              data: (items) => Column(
-                  children: items
-                      .map((item) => Card(
-                          child: ListTile(
-                              title: Text(item.name),
-                              subtitle: Text(
-                                  '${item.visibleFields.length} visible fields · v${item.version}'),
-                              onTap: () =>
-                                  _editSharing(context, ref, current: item),
-                              trailing: PopupMenuButton<String>(
-                                  onSelected: (action) async {
-                                    if (action == 'duplicate') {
-                                      await ref
-                                          .read(profileRepositoryProvider)
-                                          .saveSharing(item.copyWith(
-                                              id: const Uuid().v4(),
-                                              name: '${item.name} copy',
-                                              version: 1));
-                                    }
-                                    if (action == 'delete') {
-                                      await ref
-                                          .read(profileRepositoryProvider)
-                                          .deleteSharing(item.id);
-                                    }
-                                  },
-                                  itemBuilder: (_) => const [
-                                        PopupMenuItem(
-                                            value: 'duplicate',
-                                            child: Text('Duplicate')),
-                                        PopupMenuItem(
-                                            value: 'delete',
-                                            child: Text('Delete'))
-                                      ]))))
-                      .toList()),
-              loading: () => const LinearProgressIndicator(),
-              error: (error, _) => Text('$error')),
-        ]));
+        Text(l10n.t('sharingProfilesHint'),
+            style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 8),
+        sharing.when(
+            data: (items) => Column(
+                children: items
+                    .map((item) => Card(
+                        child: ListTile(
+                            title: Text(l10n.defaultProfileName(item.name)),
+                            subtitle: Text(l10n.t('visibleFieldsVersion', {
+                              'count': item.visibleFields.length,
+                              'version': item.version,
+                            })),
+                            onTap: () =>
+                                _editSharing(context, ref, current: item),
+                            trailing: PopupMenuButton<String>(
+                                onSelected: (action) async {
+                                  if (action == 'duplicate') {
+                                    await ref
+                                        .read(profileRepositoryProvider)
+                                        .saveSharing(item.copyWith(
+                                            id: const Uuid().v4(),
+                                            name: l10n.t('copySuffix', {
+                                              'name': l10n
+                                                  .defaultProfileName(item.name)
+                                            }),
+                                            version: 1));
+                                  }
+                                  if (action == 'delete') {
+                                    await ref
+                                        .read(profileRepositoryProvider)
+                                        .deleteSharing(item.id);
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                      PopupMenuItem(
+                                          value: 'duplicate',
+                                          child: Text(l10n.t('duplicate'))),
+                                      PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text(l10n.t('delete')))
+                                    ]))))
+                    .toList()),
+            loading: () => const LinearProgressIndicator(),
+            error: (error, _) => Text(localizedError(l10n, error))),
+      ]),
+    );
   }
 
   Future<void> _sync(BuildContext context, WidgetRef ref) async {
@@ -90,12 +99,12 @@ class ProfileScreen extends ConsumerWidget {
       await ref.read(profileRepositoryProvider).sync();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Encrypted profiles synced')));
+            SnackBar(content: Text(context.l10n.t('profilesSynced'))));
       }
-    } catch (error) {
+    } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Sync queued: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.l10n.t('syncQueued'))));
       }
     }
   }
@@ -103,34 +112,40 @@ class ProfileScreen extends ConsumerWidget {
   Future<void> _editMaster(
       BuildContext context, WidgetRef ref, MasterProfile current) async {
     final controllers = {
-      for (final field in profileFieldLabels.keys)
+      for (final field in profileFieldKeys)
         field: TextEditingController(text: current.fields[field])
     };
     final saved = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-                title: const Text('Master profile'),
-                content: SizedBox(
-                    width: 520,
-                    child: ListView(
-                        shrinkWrap: true,
-                        children: profileFieldLabels.entries
-                            .map((entry) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: TextField(
-                                    controller: controllers[entry.key],
-                                    decoration:
-                                        InputDecoration(labelText: entry.value),
-                                    maxLines: entry.key == 'notes' ? 3 : 1)))
-                            .toList())),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Save locally'))
-                ]));
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.t('masterProfile')),
+        content: SizedBox(
+          width: 520,
+          child: ListView(
+            shrinkWrap: true,
+            children: profileFieldKeys
+                .map((field) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: TextField(
+                        controller: controllers[field],
+                        decoration: InputDecoration(
+                            labelText: context.l10n.profileField(field)),
+                        maxLines: field == 'notes' ? 3 : 1,
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(context.l10n.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.l10n.t('saveLocally')))
+        ],
+      ),
+    );
     if (saved == true) {
       await ref
           .read(profileRepositoryProvider)
@@ -147,14 +162,17 @@ class ProfileScreen extends ConsumerWidget {
 
   Future<void> _editSharing(BuildContext context, WidgetRef ref,
       {SharingProfile? current}) async {
-    final name = TextEditingController(text: current?.name);
+    final name = TextEditingController(
+        text: current == null
+            ? null
+            : context.l10n.defaultProfileName(current.name));
     final selected = {...?current?.visibleFields};
     final result = await showDialog<SharingProfile>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(
-              current == null ? 'New sharing profile' : 'Edit sharing profile'),
+          title: Text(context.l10n
+              .t(current == null ? 'newSharingProfile' : 'editSharingProfile')),
           content: SizedBox(
             width: 480,
             child: ListView(
@@ -162,17 +180,16 @@ class ProfileScreen extends ConsumerWidget {
               children: [
                 TextField(
                     controller: name,
-                    decoration: const InputDecoration(labelText: 'Name')),
+                    decoration:
+                        InputDecoration(labelText: context.l10n.t('name'))),
                 const SizedBox(height: 12),
-                ...profileFieldLabels.entries.map(
-                  (entry) => CheckboxListTile(
-                    value: selected.contains(entry.key),
-                    title: Text(entry.value),
-                    onChanged: (value) => setState(
-                      () => value == true
-                          ? selected.add(entry.key)
-                          : selected.remove(entry.key),
-                    ),
+                ...profileFieldKeys.map(
+                  (field) => CheckboxListTile(
+                    value: selected.contains(field),
+                    title: Text(context.l10n.profileField(field)),
+                    onChanged: (value) => setState(() => value == true
+                        ? selected.add(field)
+                        : selected.remove(field)),
                   ),
                 ),
               ],
@@ -181,7 +198,7 @@ class ProfileScreen extends ConsumerWidget {
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
+                child: Text(context.l10n.t('cancel'))),
             FilledButton(
               onPressed: () => Navigator.pop(
                 context,
@@ -192,7 +209,7 @@ class ProfileScreen extends ConsumerWidget {
                   version: (current?.version ?? 0) + 1,
                 ),
               ),
-              child: const Text('Save'),
+              child: Text(context.l10n.t('save')),
             ),
           ],
         ),

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/database/app_database.dart';
+import '../../core/localization/app_localizations.dart';
+import '../../core/network/localized_error.dart';
 import '../../core/providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
+
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
@@ -13,7 +16,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool notifications = true;
   bool autoSync = true;
-  String language = 'English';
+  String language = 'en';
   String theme = 'system';
 
   @override
@@ -23,149 +26,162 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final rows = await ref
-        .read(databaseProvider)
-        .select(ref.read(databaseProvider).appSettings)
-        .get();
+    final database = ref.read(databaseProvider);
+    final rows = await database.select(database.appSettings).get();
     final values = {for (final row in rows) row.key: row.value};
     if (mounted) {
       setState(() {
         notifications = values['notifications'] != 'false';
         autoSync = values['autoSync'] != 'false';
-        language = values['language'] ?? 'English';
+        language = switch (values['language']) {
+          'vi' || 'Vietnamese' || 'Tiếng Việt' => 'vi',
+          'zh' || 'Chinese' || '中文' => 'zh',
+          'ja' || 'Japanese' || '日本語' => 'ja',
+          'en' || 'English' => 'en',
+          _ => detectDefaultLocale(
+                  WidgetsBinding.instance.platformDispatcher.locales)
+              .languageCode,
+        };
         theme = values['theme'] ?? 'system';
       });
     }
   }
 
   Future<void> _store(String key, String value) async {
-    await ref
-        .read(databaseProvider)
-        .into(ref.read(databaseProvider).appSettings)
-        .insertOnConflictUpdate(
-            AppSettingsCompanion.insert(key: key, value: value));
+    final database = ref.read(databaseProvider);
+    await database.into(database.appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(key: key, value: value));
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.t('settings'))),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        Text('Account', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.t('account'), style: Theme.of(context).textTheme.titleMedium),
         ref.watch(accountProvider).when(
             data: (account) => Column(children: [
                   ListTile(
                       leading: const Icon(Icons.alternate_email),
-                      title: const Text('Username'),
+                      title: Text(l10n.t('username')),
                       subtitle: Text(account['username'] as String)),
                   ListTile(
                       leading: const Icon(Icons.mark_email_read_outlined),
-                      title: const Text('Recovery email'),
+                      title: Text(l10n.t('recoveryEmail')),
                       subtitle: Text(account['recoveryEmail'] as String),
                       trailing: const Icon(Icons.edit_outlined),
                       onTap: () => _editRecoveryEmail(
                           account['recoveryEmail'] as String)),
                 ]),
             loading: () => const LinearProgressIndicator(),
-            error: (error, _) => ListTile(
-                title: const Text('Could not load account'),
-                subtitle: Text('$error'),
+            error: (_, __) => ListTile(
+                title: Text(l10n.t('couldNotLoadAccount')),
                 trailing: IconButton(
                     onPressed: () => ref.invalidate(accountProvider),
                     icon: const Icon(Icons.refresh)))),
         const Divider(),
-        Text('Preferences', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.t('preferences'),
+            style: Theme.of(context).textTheme.titleMedium),
         SwitchListTile(
-            title: const Text('Notifications'),
-            subtitle: const Text('Connection and profile update alerts'),
+            title: Text(l10n.t('notifications')),
+            subtitle: Text(l10n.t('notificationsHint')),
             value: notifications,
             onChanged: (value) {
               setState(() => notifications = value);
               _store('notifications', '$value');
             }),
         SwitchListTile(
-            title: const Text('Automatic sync'),
-            subtitle: const Text('Sync encrypted changes when online'),
+            title: Text(l10n.t('automaticSync')),
+            subtitle: Text(l10n.t('automaticSyncHint')),
             value: autoSync,
             onChanged: (value) {
               setState(() => autoSync = value);
               _store('autoSync', '$value');
             }),
         ListTile(
-            title: const Text('Theme'),
-            subtitle: Text(theme),
+            title: Text(l10n.t('theme')),
+            subtitle: Text(l10n.themeName(theme)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () async {
-              final value = await showDialog<String>(
-                  context: context,
-                  builder: (context) => SimpleDialog(
-                      title: const Text('Theme'),
-                      children: ['system', 'light', 'dark']
-                          .map((value) => SimpleDialogOption(
-                              onPressed: () => Navigator.pop(context, value),
-                              child: Text(value)))
-                          .toList()));
-              if (value != null) {
-                setState(() => theme = value);
-                await _store('theme', value);
-                ref.invalidate(themeModeProvider);
-              }
-            }),
+            onTap: _chooseTheme),
         ListTile(
-            title: const Text('Language'),
-            subtitle: Text(language),
+            title: Text(l10n.t('language')),
+            subtitle: Text(l10n.languageName(language)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () async {
-              final value = await showDialog<String>(
-                  context: context,
-                  builder: (context) => SimpleDialog(
-                      title: const Text('Language'),
-                      children: ['English', 'Tiếng Việt']
-                          .map((value) => SimpleDialogOption(
-                              onPressed: () => Navigator.pop(context, value),
-                              child: Text(value)))
-                          .toList()));
-              if (value != null) {
-                setState(() => language = value);
-                _store('language', value);
-              }
-            }),
+            onTap: _chooseLanguage),
         const Divider(),
-        Text('Your data', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.t('yourData'),
+            style: Theme.of(context).textTheme.titleMedium),
         ListTile(
             leading: const Icon(Icons.upload_file),
-            title: const Text('Export backup'),
-            subtitle: const Text('Master profile and settings as JSON'),
+            title: Text(l10n.t('exportBackup')),
+            subtitle: Text(l10n.t('exportBackupHint')),
             onTap: _export),
         ListTile(
             leading: const Icon(Icons.download),
-            title: const Text('Import backup'),
-            subtitle: const Text('Restore from NexBook JSON'),
+            title: Text(l10n.t('importBackup')),
+            subtitle: Text(l10n.t('importBackupHint')),
             onTap: _import),
         ListTile(
             leading: const Icon(Icons.password),
-            title: const Text('Change password'),
+            title: Text(l10n.t('changePassword')),
             onTap: _changePassword),
         const Divider(),
         ListTile(
             leading: const Icon(Icons.logout),
-            title: const Text('Sign out'),
+            title: Text(l10n.t('signOut')),
             onTap: () => ref.read(sessionProvider.notifier).logout()),
         ListTile(
             iconColor: Theme.of(context).colorScheme.error,
             textColor: Theme.of(context).colorScheme.error,
             leading: const Icon(Icons.delete_forever),
-            title: const Text('Delete account'),
+            title: Text(l10n.t('deleteAccount')),
             onTap: _deleteAccount),
-        const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-                'Profile content is encrypted on this device before upload. NexBook servers cannot read it.',
-                textAlign: TextAlign.center)),
-      ]));
+        Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(l10n.t('privacyNotice'), textAlign: TextAlign.center)),
+      ]),
+    );
+  }
+
+  Future<void> _chooseTheme() async {
+    final value = await showDialog<String>(
+        context: context,
+        builder: (context) => SimpleDialog(
+            title: Text(context.l10n.t('theme')),
+            children: ['system', 'light', 'dark']
+                .map((value) => SimpleDialogOption(
+                    onPressed: () => Navigator.pop(context, value),
+                    child: Text(context.l10n.themeName(value))))
+                .toList()));
+    if (value != null) {
+      setState(() => theme = value);
+      await _store('theme', value);
+      ref.invalidate(themeModeProvider);
+    }
+  }
+
+  Future<void> _chooseLanguage() async {
+    final value = await showDialog<String>(
+        context: context,
+        builder: (context) => SimpleDialog(
+            title: Text(context.l10n.t('language')),
+            children: ['en', 'vi', 'zh', 'ja']
+                .map((value) => SimpleDialogOption(
+                    onPressed: () => Navigator.pop(context, value),
+                    child: Text(context.l10n.languageName(value))))
+                .toList()));
+    if (value != null) {
+      setState(() => language = value);
+      await _store('language', value);
+      ref.invalidate(localeProvider);
+    }
+  }
 
   Future<void> _export() async {
+    final subject = context.l10n.t('backupSubject');
     final value = await ref.read(profileRepositoryProvider).exportJson();
-    await Share.share(value, subject: 'NexBook encrypted-device backup');
+    await Share.share(value, subject: subject);
   }
 
   Future<void> _import() async {
@@ -173,26 +189,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final raw = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Paste backup JSON'),
+                title: Text(context.l10n.t('pasteBackupJson')),
                 content: TextField(
                     controller: controller, minLines: 6, maxLines: 14),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel')),
+                      child: Text(context.l10n.t('cancel'))),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, controller.text),
-                      child: const Text('Import'))
+                      child: Text(context.l10n.t('import')))
                 ]));
     controller.dispose();
     if (raw == null) return;
     try {
       await ref.read(profileRepositoryProvider).importJson(raw);
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Invalid backup: $error')));
-      }
+    } catch (_) {
+      if (mounted) _show(context.l10n.t('invalidBackup'));
     }
   }
 
@@ -200,109 +213,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final accepted = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Delete account permanently?'),
-                content: const Text(
-                    'Your account, connections, encrypted blobs, device keys, and local data will be removed. This cannot be undone.'),
+                title: Text(context.l10n.t('deleteAccountQuestion')),
+                content: Text(context.l10n.t('deleteAccountWarning')),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel')),
+                      child: Text(context.l10n.t('cancel'))),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Delete'))
+                      child: Text(context.l10n.t('delete')))
                 ]));
     if (accepted == true) {
-      await ref.read(apiClientProvider).dio.delete<void>('/me');
-      await ref.read(databaseProvider).clearAll();
-      await ref.read(secureStorageProvider).deleteAll();
-      ref.invalidate(sessionProvider);
+      try {
+        await ref.read(apiClientProvider).dio.delete<void>('/me');
+        await ref.read(databaseProvider).clearAll();
+        await ref.read(secureStorageProvider).deleteAll();
+        ref.invalidate(sessionProvider);
+      } catch (error) {
+        if (mounted) _show(localizedError(context.l10n, error));
+      }
     }
   }
 
   Future<void> _changePassword() async {
+    final l10n = context.l10n;
     final current = TextEditingController();
     final next = TextEditingController();
     final accepted = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Change password'),
+                title: Text(context.l10n.t('changePassword')),
                 content: Column(mainAxisSize: MainAxisSize.min, children: [
                   TextField(
                       controller: current,
                       obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'Current password')),
+                      decoration: InputDecoration(
+                          labelText: context.l10n.t('currentPassword'))),
                   const SizedBox(height: 12),
                   TextField(
                       controller: next,
                       obscureText: true,
-                      decoration: const InputDecoration(
-                          labelText: 'New password (10+ characters)'))
+                      decoration: InputDecoration(
+                          labelText: context.l10n.t('newPasswordMin')))
                 ]),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel')),
+                      child: Text(context.l10n.t('cancel'))),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Change'))
+                      child: Text(context.l10n.t('change')))
                 ]));
     if (accepted == true) {
-      await ref
-          .read(authRepositoryProvider)
-          .changePassword(current.text, next.text);
-      await ref.read(sessionProvider.notifier).logout();
+      if (next.text.length < 10) {
+        _show(l10n.t('error.weakPassword'));
+      } else {
+        try {
+          await ref
+              .read(authRepositoryProvider)
+              .changePassword(current.text, next.text);
+          await ref.read(sessionProvider.notifier).logout();
+        } catch (error) {
+          if (mounted) _show(localizedError(context.l10n, error));
+        }
+      }
     }
     current.dispose();
     next.dispose();
   }
 
   Future<void> _editRecoveryEmail(String currentEmail) async {
+    final l10n = context.l10n;
     final email = TextEditingController(text: currentEmail);
     final password = TextEditingController();
     final accepted = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Change recovery email'),
+                title: Text(context.l10n.t('changeRecoveryEmail')),
                 content: Column(mainAxisSize: MainAxisSize.min, children: [
                   TextField(
                       controller: email,
                       keyboardType: TextInputType.emailAddress,
-                      decoration:
-                          const InputDecoration(labelText: 'Recovery email')),
+                      decoration: InputDecoration(
+                          labelText: context.l10n.t('recoveryEmail'))),
                   const SizedBox(height: 12),
                   TextField(
                       controller: password,
                       obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'Current password')),
+                      decoration: InputDecoration(
+                          labelText: context.l10n.t('currentPassword'))),
                 ]),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel')),
+                      child: Text(context.l10n.t('cancel'))),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Save')),
+                      child: Text(context.l10n.t('save'))),
                 ]));
     if (accepted == true) {
-      try {
-        await ref
-            .read(authRepositoryProvider)
-            .updateRecoveryEmail(email.text, password.text);
-        ref.invalidate(accountProvider);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Recovery email has been updated.')));
-        }
-      } catch (error) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('$error')));
+      if (!_isValidEmail(email.text)) {
+        _show(l10n.t('error.invalidEmail'));
+      } else if (password.text.isEmpty) {
+        _show(l10n.t('error.invalidPassword'));
+      } else {
+        try {
+          await ref
+              .read(authRepositoryProvider)
+              .updateRecoveryEmail(email.text, password.text);
+          ref.invalidate(accountProvider);
+          if (mounted) _show(context.l10n.t('recoveryEmailUpdated'));
+        } catch (error) {
+          if (mounted) _show(localizedError(context.l10n, error));
         }
       }
     }
     email.dispose();
     password.dispose();
   }
+
+  bool _isValidEmail(String value) =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim());
+
+  void _show(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
 }

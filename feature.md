@@ -259,6 +259,9 @@ User settings include:
 
 * Theme
 * Language
+  * Defaults from device/browser locale: Vietnamese for `vi`/Vietnam,
+    Chinese for `zh`/China, Japanese for `ja`/Japan, and English otherwise
+  * Can be changed manually to English, Vietnamese, Chinese, or Japanese
 * Notification
 * Auto Sync
 * Recovery Email

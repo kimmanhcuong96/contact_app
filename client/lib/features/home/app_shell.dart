@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
+import '../../core/localization/app_localizations.dart';
 import '../profile/profile_screen.dart';
 import '../connections/connections_screen.dart';
 import '../qr/qr_screen.dart';
@@ -29,20 +30,21 @@ class _AppShellState extends ConsumerState<AppShell> {
       bottomNavigationBar: NavigationBar(
           selectedIndex: index,
           onDestinationSelected: (value) => setState(() => index = value),
-          destinations: const [
+          destinations: [
             NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profile'),
+                icon: const Icon(Icons.person_outline),
+                selectedIcon: const Icon(Icons.person),
+                label: context.l10n.t('profile')),
             NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: 'Contacts'),
-            NavigationDestination(icon: Icon(Icons.qr_code), label: 'My QR'),
+                icon: const Icon(Icons.people_outline),
+                selectedIcon: const Icon(Icons.people),
+                label: context.l10n.t('contacts')),
             NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: 'Settings'),
+                icon: const Icon(Icons.qr_code), label: context.l10n.t('myQr')),
+            NavigationDestination(
+                icon: const Icon(Icons.settings_outlined),
+                selectedIcon: const Icon(Icons.settings),
+                label: context.l10n.t('settings')),
           ]),
     );
   }

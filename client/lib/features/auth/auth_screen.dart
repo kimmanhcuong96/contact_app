@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/localization/app_localizations.dart';
+import '../../core/network/localized_error.dart';
 import '../../core/providers.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
+
   @override
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
@@ -27,6 +30,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
+    final l10n = context.l10n;
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -44,46 +48,53 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     Text('NexBook',
                         style: Theme.of(context).textTheme.headlineMedium),
                     const SizedBox(height: 8),
-                    Text('Your contacts. Your keys.',
+                    Text(l10n.t('tagline'),
                         style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 24),
                     TextField(
-                        controller: username,
-                        autocorrect: false,
-                        decoration: InputDecoration(
-                            labelText: 'Username',
-                            helperText: register
-                                ? '3–32 characters: letters, numbers, . or _'
-                                : 'Existing accounts may temporarily use email')),
+                      controller: username,
+                      autocorrect: false,
+                      decoration: InputDecoration(
+                        labelText: l10n.t('username'),
+                        helperText: register
+                            ? l10n.t('usernameHint')
+                            : l10n.t('legacyLoginHint'),
+                      ),
+                    ),
                     if (register) ...[
                       const SizedBox(height: 12),
                       TextField(
-                          controller: recoveryEmail,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                              labelText: 'Recovery email',
-                              helperText:
-                                  'Only used if you forget your password')),
+                        controller: recoveryEmail,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: l10n.t('recoveryEmail'),
+                          helperText: l10n.t('recoveryEmailHint'),
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 12),
                     TextField(
-                        controller: password,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                            labelText: 'Password (10+ characters)')),
+                      controller: password,
+                      obscureText: true,
+                      decoration:
+                          InputDecoration(labelText: l10n.t('passwordMin')),
+                    ),
                     if (register) ...[
                       const SizedBox(height: 12),
                       TextField(
-                          controller: passwordConfirmation,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                              labelText: 'Re-enter password')),
+                        controller: passwordConfirmation,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                            labelText: l10n.t('reenterPassword')),
+                      ),
                     ],
                     const SizedBox(height: 16),
                     if (session.hasError)
-                      Text(session.error.toString(),
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.error)),
+                      Text(
+                        localizedError(l10n, session.error),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      ),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
@@ -92,24 +103,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             ? const SizedBox.square(
                                 dimension: 20,
                                 child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : Text(register ? 'Create account' : 'Sign in'),
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(register
+                                ? l10n.t('createAccount')
+                                : l10n.t('signIn')),
                       ),
                     ),
                     if (!register)
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          TextButton(
-                              onPressed: _forgot,
-                              child: const Text('Forgot password?')),
-                        ],
+                      TextButton(
+                        onPressed: _forgot,
+                        child: Text(l10n.t('forgotPassword')),
                       ),
                     TextButton(
                       onPressed: () => setState(() => register = !register),
                       child: Text(register
-                          ? 'Already have an account?'
-                          : 'Create an account'),
+                          ? l10n.t('alreadyHaveAccount')
+                          : l10n.t('createAnAccount')),
                     ),
                   ],
                 ),
@@ -122,15 +132,47 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _submit() async {
+    final l10n = context.l10n;
+    final normalizedUsername = username.text.trim();
+    if (normalizedUsername.isEmpty) {
+      _show(l10n.t('error.usernameRequired'));
+      return;
+    }
     if (register) {
-      if (password.text != passwordConfirmation.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Passwords do not match.')));
+      if (!RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._]{2,31}$')
+          .hasMatch(normalizedUsername)) {
+        _show(l10n.t('error.invalidUsername'));
         return;
       }
-      await ref.read(sessionProvider.notifier).register(username.text,
-          recoveryEmail.text, password.text, passwordConfirmation.text);
+      if (!_isValidEmail(recoveryEmail.text)) {
+        _show(l10n.t('error.invalidEmail'));
+        return;
+      }
+      if (password.text.length < 10) {
+        _show(l10n.t('error.weakPassword'));
+        return;
+      }
+      if (password.text != passwordConfirmation.text) {
+        _show(l10n.t('error.passwordMismatch'));
+        return;
+      }
+      final created = await ref.read(sessionProvider.notifier).register(
+          username.text,
+          recoveryEmail.text,
+          password.text,
+          passwordConfirmation.text);
+      if (created && mounted) {
+        recoveryEmail.clear();
+        password.clear();
+        passwordConfirmation.clear();
+        setState(() => register = false);
+        _show(context.l10n.t('accountCreatedSignIn'));
+      }
     } else {
+      if (password.text.length < 10) {
+        _show(l10n.t('error.weakPassword'));
+        return;
+      }
       await ref
           .read(sessionProvider.notifier)
           .login(username.text, password.text);
@@ -138,17 +180,29 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _forgot() async {
-    final email = await _ask('Recovery email');
+    final l10n = context.l10n;
+    final email = await _ask(l10n.t('recoveryEmail'));
     if (email == null || email.isEmpty) return;
-    final response =
-        await ref.read(authRepositoryProvider).forgotPassword(email);
-    if (!mounted) return;
-    final token = await _ask('Reset token',
-        initialValue: response['developmentToken'] as String?);
-    if (token == null || !mounted) return;
-    final nextPassword = await _ask('New password', obscure: true);
-    if (nextPassword != null) {
+    if (!_isValidEmail(email)) {
+      _show(l10n.t('error.invalidEmail'));
+      return;
+    }
+    try {
+      final response =
+          await ref.read(authRepositoryProvider).forgotPassword(email);
+      if (!mounted) return;
+      final token = await _ask(l10n.t('resetToken'),
+          initialValue: response['developmentToken'] as String?);
+      if (token == null || !mounted) return;
+      final nextPassword = await _ask(l10n.t('newPassword'), obscure: true);
+      if (nextPassword == null) return;
+      if (nextPassword.length < 10) {
+        _show(l10n.t('error.weakPassword'));
+        return;
+      }
       await ref.read(authRepositoryProvider).resetPassword(token, nextPassword);
+    } catch (error) {
+      if (mounted) _show(localizedError(context.l10n, error));
     }
   }
 
@@ -156,23 +210,33 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       {String? initialValue, bool obscure = false}) async {
     final controller = TextEditingController(text: initialValue);
     final value = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-                title: Text(label),
-                content: TextField(
-                    controller: controller,
-                    obscureText: obscure,
-                    autofocus: true),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(context, controller.text.trim()),
-                      child: const Text('Continue'))
-                ]));
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(label),
+        content: TextField(
+          controller: controller,
+          obscureText: obscure,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: Text(context.l10n.t('continue')),
+          ),
+        ],
+      ),
+    );
     controller.dispose();
     return value;
   }
+
+  bool _isValidEmail(String value) =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim());
+
+  void _show(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/providers.dart';
+import 'core/localization/app_localizations.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/app_shell.dart';
 import 'features/qr/scan_screen.dart';
@@ -35,6 +37,14 @@ class NexBookApp extends ConsumerWidget {
         title: 'NexBook',
         debugShowCheckedModeBanner: false,
         routerConfig: ref.watch(routerProvider),
+        locale: ref.watch(localeProvider).valueOrNull,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
                 seedColor: const Color(0xff315cfd),

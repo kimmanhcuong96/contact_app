@@ -9,14 +9,12 @@ class AuthRepository {
 
   Future<void> register(String username, String recoveryEmail, String password,
       String passwordConfirmation) async {
-    final response =
-        await api.dio.post<Map<String, dynamic>>('/auth/register', data: {
+    await api.dio.post<void>('/auth/register', data: {
       'username': username,
       'recoveryEmail': recoveryEmail,
       'password': password,
       'passwordConfirmation': passwordConfirmation,
     });
-    await _completeAuthentication(response.data!);
   }
 
   Future<Map<String, dynamic>> forgotPassword(String email) async =>

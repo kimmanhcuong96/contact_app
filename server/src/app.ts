@@ -52,7 +52,7 @@ app.delete('/v1/me', requireAuth, async (c) => { await new AuthRepository(c.var.
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'Route not found' } }, 404));
 app.onError((error, c) => {
-  if (error instanceof HttpError) return c.json({ error: { code: error.code, message: error.message } }, error.status as 400);
+  if (error instanceof HttpError) return c.json({ error: { code: error.code, message: error.message, ...error.details } }, error.status as 400);
   if (error.name === 'ZodError') return c.json({ error: { code: 'validation_error', message: 'Invalid request value' } }, 422);
   console.error('Unhandled API error', { name: error.name, message: error.message });
   return c.json({ error: { code: 'internal_error', message: 'Internal server error' } }, 500);

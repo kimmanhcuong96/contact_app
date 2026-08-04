@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../core/localization/app_localizations.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -11,7 +12,7 @@ class _ScanScreenState extends State<ScanScreen> {
   bool handled = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Scan NexBook QR')),
+      appBar: AppBar(title: Text(context.l10n.t('scanQr'))),
       body: MobileScanner(onDetect: (capture) {
         if (handled) return;
         final value = capture.barcodes.firstOrNull?.rawValue;

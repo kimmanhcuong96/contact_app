@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/localization/app_localizations.dart';
+import '../../core/network/localized_error.dart';
 import '../../core/providers.dart';
 
 final connectionSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -14,9 +16,10 @@ class ConnectionsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Contacts'),
+        title: Text(l10n.t('contacts')),
         actions: [
           IconButton(
             onPressed: () => ref.read(connectionRepositoryProvider).sync(),
@@ -27,7 +30,7 @@ class ConnectionsScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _add(context, ref),
         icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Scan'),
+        label: Text(l10n.t('scan')),
       ),
       body: ref.watch(connectionsProvider).when(
             data: (items) {
@@ -45,7 +48,7 @@ class ConnectionsScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                     child: SearchBar(
-                      hintText: 'Search name, nickname, or company',
+                      hintText: l10n.t('searchContacts'),
                       leading: const Icon(Icons.search),
                       onChanged: (value) => ref
                           .read(connectionSearchProvider.notifier)
@@ -54,9 +57,7 @@ class ConnectionsScreen extends ConsumerWidget {
                   ),
                   Expanded(
                     child: filtered.isEmpty
-                        ? const Center(
-                            child: Text(
-                                'No contacts found. Scan a NexBook QR to connect.'))
+                        ? Center(child: Text(l10n.t('noContacts')))
                         : ListView.builder(
                             padding: const EdgeInsets.all(12),
                             itemCount: filtered.length,
@@ -72,48 +73,48 @@ class ConnectionsScreen extends ConsumerWidget {
                                   leading: const CircleAvatar(
                                       child: Icon(Icons.person)),
                                   title: Text(fields?['fullName'] as String? ??
-                                      'Private contact'),
-                                  subtitle: Text(
-                                    item.status == 'pending'
-                                        ? 'Connection request · ${item.peerUserId}'
-                                        : fields?['company'] as String? ??
-                                            item.peerUserId,
-                                  ),
+                                      l10n.t('privateContact')),
+                                  subtitle: Text(item.status == 'pending'
+                                      ? l10n.t('connectionRequest',
+                                          {'id': item.peerUserId})
+                                      : fields?['company'] as String? ??
+                                          item.peerUserId),
                                   trailing: PopupMenuButton<String>(
                                     onSelected: (action) =>
                                         _action(context, ref, item, action),
                                     itemBuilder: (_) => [
                                       if (item.status == 'pending' &&
                                           item.direction == 'incoming')
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
                                             value: 'accept',
-                                            child: Text('Accept')),
+                                            child: Text(l10n.t('accept'))),
                                       if (item.status == 'pending' &&
                                           item.direction == 'incoming')
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
                                             value: 'reject',
-                                            child: Text('Reject')),
+                                            child: Text(l10n.t('reject'))),
                                       if (item.status == 'pending' &&
                                           item.direction == 'outgoing')
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
                                             value: 'cancel',
-                                            child: Text('Cancel request')),
-                                      if (item.status == 'connected')
-                                        const PopupMenuItem(
-                                            value: 'assign',
                                             child:
-                                                Text('Change sharing profile')),
+                                                Text(l10n.t('cancelRequest'))),
                                       if (item.status == 'connected')
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
+                                            value: 'assign',
+                                            child: Text(l10n
+                                                .t('changeSharingProfile'))),
+                                      if (item.status == 'connected')
+                                        PopupMenuItem(
                                             value: 'disable',
-                                            child: Text('Disable')),
+                                            child: Text(l10n.t('disable'))),
                                       if (item.status == 'disabled')
-                                        const PopupMenuItem(
+                                        PopupMenuItem(
                                             value: 'enable',
-                                            child: Text('Enable')),
-                                      const PopupMenuItem(
+                                            child: Text(l10n.t('enable'))),
+                                      PopupMenuItem(
                                           value: 'delete',
-                                          child: Text('Delete')),
+                                          child: Text(l10n.t('delete'))),
                                     ],
                                   ),
                                 ),
@@ -125,8 +126,8 @@ class ConnectionsScreen extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) =>
-                Center(child: Text('Offline cache unavailable: $error')),
+            error: (_, __) =>
+                Center(child: Text(l10n.t('offlineCacheUnavailable'))),
           ),
     );
   }
@@ -139,14 +140,13 @@ class ConnectionsScreen extends ConsumerWidget {
     return showDialog<SharingProfileRow>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Share which profile?'),
+        title: Text(context.l10n.t('shareWhichProfile')),
         children: rows
-            .map(
-              (row) => SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, row),
-                child: Text(jsonDecode(row.json)['name'] as String),
-              ),
-            )
+            .map((row) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, row),
+                  child: Text(context.l10n.defaultProfileName(
+                      jsonDecode(row.json)['name'] as String)),
+                ))
             .toList(),
       ),
     );
@@ -161,10 +161,7 @@ class ConnectionsScreen extends ConsumerWidget {
       await ref.read(profileRepositoryProvider).sync();
       await ref.read(connectionRepositoryProvider).request(peerId, sharing);
     } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$error')));
-      }
+      if (context.mounted) _showError(context, error);
     }
   }
 
@@ -188,10 +185,11 @@ class ConnectionsScreen extends ConsumerWidget {
             peerUserId: item.peerUserId,
           );
     } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$error')));
-      }
+      if (context.mounted) _showError(context, error);
     }
   }
+
+  void _showError(BuildContext context, Object error) =>
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(localizedError(context.l10n, error))));
 }

@@ -15,7 +15,7 @@ export class AuthService {
     if (await this.repo.findUserByUsername(normalizedUsername)) throw new HttpError(409, 'Username is already taken', 'username_exists');
     if (await this.repo.findUserByRecoveryEmail(normalizedEmail)) throw new HttpError(409, 'Recovery email is already in use', 'recovery_email_exists');
     const user = await this.repo.createUser(normalizedUsername, normalizedEmail, await hash(password, 12));
-    return { userId: user.id, ...(await this.issueTokens(user.id)) };
+    return { userId: user.id };
   }
 
   async login(identifier: string, password: string) {

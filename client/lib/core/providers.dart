@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 import 'database/app_database.dart';
+import 'localization/app_localizations.dart';
 import 'network/api_client.dart';
 import 'security/crypto_service.dart';
 import '../repositories/auth_repository.dart';
@@ -65,6 +66,21 @@ final themeModeProvider = FutureProvider<ThemeMode>((ref) async {
     _ => ThemeMode.system
   };
 });
+final localeProvider = FutureProvider<Locale>((ref) async {
+  final database = ref.watch(databaseProvider);
+  final row = await (database.select(database.appSettings)
+        ..where((item) => item.key.equals('language')))
+      .getSingleOrNull();
+  final code = switch (row?.value) {
+    'vi' || 'Vietnamese' || 'Tiếng Việt' => 'vi',
+    'zh' || 'Chinese' || '中文' => 'zh',
+    'ja' || 'Japanese' || '日本語' => 'ja',
+    'en' || 'English' => 'en',
+    _ => detectDefaultLocale(WidgetsBinding.instance.platformDispatcher.locales)
+        .languageCode,
+  };
+  return Locale(code);
+});
 
 class SessionController extends AsyncNotifier<bool> {
   @override
@@ -78,16 +94,16 @@ class SessionController extends AsyncNotifier<bool> {
     });
   }
 
-  Future<void> register(String username, String recoveryEmail, String password,
+  Future<bool> register(String username, String recoveryEmail, String password,
       String passwordConfirmation) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await ref
           .read(authRepositoryProvider)
           .register(username, recoveryEmail, password, passwordConfirmation);
-      await ref.read(profileRepositoryProvider).initializeDefaults();
-      return true;
+      return false;
     });
+    return !state.hasError;
   }
 
   Future<void> logout() async {
