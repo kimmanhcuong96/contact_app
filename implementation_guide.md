@@ -151,6 +151,10 @@ Domain:
 * devices
 * refresh_tokens
 
+The `users` table stores a unique username for sign-in and a separate unique
+recovery email. Registration requires password confirmation and activates the
+account immediately; recovery email changes require the current password.
+
 ---
 
 # Folder Structure

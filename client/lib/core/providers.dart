@@ -24,6 +24,8 @@ final cryptoProvider =
     Provider((ref) => CryptoService(ref.watch(secureStorageProvider)));
 final authRepositoryProvider = Provider((ref) =>
     AuthRepository(ref.watch(apiClientProvider), ref.watch(cryptoProvider)));
+final accountProvider = FutureProvider<Map<String, dynamic>>(
+    (ref) => ref.watch(authRepositoryProvider).getAccount());
 final profileRepositoryProvider = Provider((ref) => ProfileRepository(
     ref.watch(databaseProvider),
     ref.watch(apiClientProvider),
@@ -67,17 +69,27 @@ final themeModeProvider = FutureProvider<ThemeMode>((ref) async {
 class SessionController extends AsyncNotifier<bool> {
   @override
   Future<bool> build() => ref.read(apiClientProvider).hasSession;
-  Future<void> login(String email, String password) async {
+  Future<void> login(String identifier, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await ref.read(authRepositoryProvider).login(email, password);
+      await ref.read(authRepositoryProvider).login(identifier, password);
       await ref.read(profileRepositoryProvider).initializeDefaults();
       return true;
     });
   }
 
-  Future<Map<String, dynamic>> register(String email, String password) =>
-      ref.read(authRepositoryProvider).register(email, password);
+  Future<void> register(String username, String recoveryEmail, String password,
+      String passwordConfirmation) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref
+          .read(authRepositoryProvider)
+          .register(username, recoveryEmail, password, passwordConfirmation);
+      await ref.read(profileRepositoryProvider).initializeDefaults();
+      return true;
+    });
+  }
+
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(false);

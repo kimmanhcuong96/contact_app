@@ -29,4 +29,32 @@ describe('HTTP boundary', () => {
     }, env);
     expect(response.status).toBe(422);
   });
+
+  it('requires matching passwords when registering', async () => {
+    const response = await app.request('/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'new.user',
+        recoveryEmail: 'recovery@example.com',
+        password: 'long-password-1',
+        passwordConfirmation: 'long-password-2',
+      }),
+    }, env);
+    expect(response.status).toBe(422);
+  });
+
+  it('rejects invalid usernames before accessing the database', async () => {
+    const response = await app.request('/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'not allowed',
+        recoveryEmail: 'recovery@example.com',
+        password: 'long-password-1',
+        passwordConfirmation: 'long-password-1',
+      }),
+    }, env);
+    expect(response.status).toBe(422);
+  });
 });

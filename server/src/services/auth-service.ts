@@ -9,27 +9,19 @@ import { EmailService } from './email-service';
 export class AuthService {
   constructor(private repo: AuthRepository, private email: EmailService, private env: Env) {}
 
-  async register(email: string, password: string) {
-    const normalized = email.trim().toLowerCase();
-    if (await this.repo.findUserByEmail(normalized)) throw new HttpError(409, 'Email is already registered', 'email_exists');
-    const user = await this.repo.createUser(normalized, await hash(password, 12));
-    const token = randomToken();
-    await this.repo.createOneTimeToken(user.id, 'verify_email', await sha256(token), new Date(Date.now() + 86_400_000));
-    await this.email.sendAction(normalized, 'Verify your NexBook email', 'verify-email', token);
-    return { userId: user.id, verificationRequired: true, ...(this.env.RESEND_API_KEY ? {} : { developmentToken: token }) };
+  async register(username: string, recoveryEmail: string, password: string) {
+    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedEmail = recoveryEmail.trim().toLowerCase();
+    if (await this.repo.findUserByUsername(normalizedUsername)) throw new HttpError(409, 'Username is already taken', 'username_exists');
+    if (await this.repo.findUserByRecoveryEmail(normalizedEmail)) throw new HttpError(409, 'Recovery email is already in use', 'recovery_email_exists');
+    const user = await this.repo.createUser(normalizedUsername, normalizedEmail, await hash(password, 12));
+    return { userId: user.id, ...(await this.issueTokens(user.id)) };
   }
 
-  async verifyEmail(token: string) {
-    const record = await this.repo.findOneTimeToken(await sha256(token), 'verify_email');
-    if (!record) throw new HttpError(400, 'Verification token is invalid or expired', 'invalid_token');
-    await this.repo.activateUser(record.userId);
-    await this.repo.consumeOneTimeToken(record.id);
-  }
-
-  async login(email: string, password: string) {
-    const user = await this.repo.findUserByEmail(email.trim().toLowerCase());
-    if (!user || !(await compare(password, user.passwordHash))) throw new HttpError(401, 'Invalid email or password', 'invalid_credentials');
-    if (user.status !== 'active') throw new HttpError(403, 'Verify your email before signing in', 'email_unverified');
+  async login(identifier: string, password: string) {
+    const user = await this.repo.findUserByLogin(identifier.trim().toLowerCase());
+    if (!user || !(await compare(password, user.passwordHash))) throw new HttpError(401, 'Invalid username or password', 'invalid_credentials');
+    if (user.status !== 'active') throw new HttpError(403, 'Account is disabled', 'account_disabled');
     await this.repo.touchLogin(user.id);
     return this.issueTokens(user.id);
   }
@@ -44,11 +36,11 @@ export class AuthService {
   async logout(rawToken: string) { await this.repo.revokeRefreshToken(await sha256(rawToken)); }
 
   async forgotPassword(email: string) {
-    const user = await this.repo.findUserByEmail(email.trim().toLowerCase());
+    const user = await this.repo.findUserByRecoveryEmail(email.trim().toLowerCase());
     if (!user) return {};
     const token = randomToken();
     await this.repo.createOneTimeToken(user.id, 'reset_password', await sha256(token), new Date(Date.now() + 3_600_000));
-    await this.email.sendAction(user.email, 'Reset your NexBook password', 'reset-password', token);
+    await this.email.sendAction(user.recoveryEmail, 'Reset your NexBook password', 'reset-password', token);
     return this.env.RESEND_API_KEY ? {} : { developmentToken: token };
   }
 
@@ -67,6 +59,15 @@ export class AuthService {
     await this.repo.revokeAllUserTokens(userId);
   }
 
+  async updateRecoveryEmail(userId: string, recoveryEmail: string, currentPassword: string) {
+    const user = await this.repo.findUserById(userId);
+    if (!user || !(await compare(currentPassword, user.passwordHash))) throw new HttpError(400, 'Current password is incorrect', 'invalid_password');
+    const normalized = recoveryEmail.trim().toLowerCase();
+    const existing = await this.repo.findUserByRecoveryEmail(normalized);
+    if (existing && existing.id !== userId) throw new HttpError(409, 'Recovery email is already in use', 'recovery_email_exists');
+    await this.repo.updateRecoveryEmail(userId, normalized);
+  }
+
   private async issueTokens(userId: string) {
     const ttlDays = Number(this.env.REFRESH_TOKEN_TTL_DAYS ?? 30);
     const refreshToken = randomToken(48);
@@ -74,4 +75,3 @@ export class AuthService {
     return { accessToken: await createAccessToken(userId, this.env.JWT_SECRET, Number(this.env.ACCESS_TOKEN_TTL_SECONDS ?? 900)), refreshToken, expiresIn: Number(this.env.ACCESS_TOKEN_TTL_SECONDS ?? 900) };
   }
 }
-

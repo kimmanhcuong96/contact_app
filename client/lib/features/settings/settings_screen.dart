@@ -50,6 +50,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
+        Text('Account', style: Theme.of(context).textTheme.titleMedium),
+        ref.watch(accountProvider).when(
+            data: (account) => Column(children: [
+                  ListTile(
+                      leading: const Icon(Icons.alternate_email),
+                      title: const Text('Username'),
+                      subtitle: Text(account['username'] as String)),
+                  ListTile(
+                      leading: const Icon(Icons.mark_email_read_outlined),
+                      title: const Text('Recovery email'),
+                      subtitle: Text(account['recoveryEmail'] as String),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editRecoveryEmail(
+                          account['recoveryEmail'] as String)),
+                ]),
+            loading: () => const LinearProgressIndicator(),
+            error: (error, _) => ListTile(
+                title: const Text('Could not load account'),
+                subtitle: Text('$error'),
+                trailing: IconButton(
+                    onPressed: () => ref.invalidate(accountProvider),
+                    icon: const Icon(Icons.refresh)))),
+        const Divider(),
         Text('Preferences', style: Theme.of(context).textTheme.titleMedium),
         SwitchListTile(
             title: const Text('Notifications'),
@@ -232,5 +255,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     current.dispose();
     next.dispose();
+  }
+
+  Future<void> _editRecoveryEmail(String currentEmail) async {
+    final email = TextEditingController(text: currentEmail);
+    final password = TextEditingController();
+    final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Change recovery email'),
+                content: Column(mainAxisSize: MainAxisSize.min, children: [
+                  TextField(
+                      controller: email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration:
+                          const InputDecoration(labelText: 'Recovery email')),
+                  const SizedBox(height: 12),
+                  TextField(
+                      controller: password,
+                      obscureText: true,
+                      decoration:
+                          const InputDecoration(labelText: 'Current password')),
+                ]),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Save')),
+                ]));
+    if (accepted == true) {
+      try {
+        await ref
+            .read(authRepositoryProvider)
+            .updateRecoveryEmail(email.text, password.text);
+        ref.invalidate(accountProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Recovery email has been updated.')));
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('$error')));
+        }
+      }
+    }
+    email.dispose();
+    password.dispose();
   }
 }

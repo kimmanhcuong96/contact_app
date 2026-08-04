@@ -35,7 +35,7 @@ app.route('/v1/devices', deviceRoutes);
 app.get('/v1/me', requireAuth, async (c) => {
   const user = await new AuthRepository(c.var.db).findUserById(c.var.userId);
   if (!user) throw new HttpError(404, 'User not found', 'not_found');
-  return c.json({ id: user.id, email: user.email, status: user.status, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt });
+  return c.json({ id: user.id, username: user.username, recoveryEmail: user.recoveryEmail, status: user.status, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt });
 });
 app.put('/v1/me/key', requireAuth, async (c) => {
   const body = await c.req.json<{ publicKey?: string }>();

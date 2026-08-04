@@ -1,20 +1,29 @@
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import type { Database } from '../database/client';
 import { oneTimeTokens, refreshTokens, users } from '../database/schema';
 
 export class AuthRepository {
   constructor(private db: Database) {}
 
-  findUserByEmail(email: string) { return this.db.query.users.findFirst({ where: eq(users.email, email) }); }
-  findUserById(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id) }); }
-  createUser(email: string, passwordHash: string) {
-    return this.db.insert(users).values({ email, passwordHash }).returning().then((rows) => rows[0]);
+  findUserByUsername(username: string) { return this.db.query.users.findFirst({ where: eq(users.username, username) }); }
+  findUserByRecoveryEmail(recoveryEmail: string) { return this.db.query.users.findFirst({ where: eq(users.recoveryEmail, recoveryEmail) }); }
+  findUserByLogin(identifier: string) {
+    return this.db.query.users.findFirst({
+      where: or(
+        eq(users.username, identifier),
+        and(eq(users.recoveryEmail, identifier), eq(users.legacyEmailLogin, true)),
+      ),
+    });
   }
-  activateUser(id: string) {
-    return this.db.update(users).set({ status: 'active', emailVerifiedAt: new Date() }).where(eq(users.id, id));
+  findUserById(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id) }); }
+  createUser(username: string, recoveryEmail: string, passwordHash: string) {
+    return this.db.insert(users).values({ username, recoveryEmail, passwordHash }).returning().then((rows) => rows[0]);
   }
   touchLogin(id: string) { return this.db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, id)); }
   updatePassword(id: string, passwordHash: string) { return this.db.update(users).set({ passwordHash }).where(eq(users.id, id)); }
+  updateRecoveryEmail(id: string, recoveryEmail: string) {
+    return this.db.update(users).set({ recoveryEmail }).where(eq(users.id, id));
+  }
   updatePublicKey(id: string, publicKey: string) { return this.db.update(users).set({ publicKey }).where(eq(users.id, id)); }
   deleteUser(id: string) { return this.db.delete(users).where(eq(users.id, id)); }
 

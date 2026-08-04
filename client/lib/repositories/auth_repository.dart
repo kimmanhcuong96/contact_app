@@ -7,12 +7,16 @@ class AuthRepository {
   final ApiClient api;
   final CryptoService crypto;
 
-  Future<Map<String, dynamic>> register(String email, String password) async =>
-      (await api.dio.post<Map<String, dynamic>>('/auth/register',
-              data: {'email': email, 'password': password}))
-          .data!;
-  Future<void> verifyEmail(String token) async {
-    await api.dio.post<void>('/auth/verify-email', data: {'token': token});
+  Future<void> register(String username, String recoveryEmail, String password,
+      String passwordConfirmation) async {
+    final response =
+        await api.dio.post<Map<String, dynamic>>('/auth/register', data: {
+      'username': username,
+      'recoveryEmail': recoveryEmail,
+      'password': password,
+      'passwordConfirmation': passwordConfirmation,
+    });
+    await _completeAuthentication(response.data!);
   }
 
   Future<Map<String, dynamic>> forgotPassword(String email) async =>
@@ -29,10 +33,25 @@ class AuthRepository {
         data: {'currentPassword': currentPassword, 'password': password});
   }
 
-  Future<void> login(String email, String password) async {
+  Future<Map<String, dynamic>> getAccount() async =>
+      (await api.dio.get<Map<String, dynamic>>('/me')).data!;
+
+  Future<void> updateRecoveryEmail(
+      String recoveryEmail, String currentPassword) async {
+    await api.dio.put<void>('/auth/recovery-email', data: {
+      'recoveryEmail': recoveryEmail,
+      'currentPassword': currentPassword,
+    });
+  }
+
+  Future<void> login(String identifier, String password) async {
     final response = await api.dio.post<Map<String, dynamic>>('/auth/login',
-        data: {'email': email, 'password': password});
-    await api.saveTokens(response.data!);
+        data: {'identifier': identifier, 'password': password});
+    await _completeAuthentication(response.data!);
+  }
+
+  Future<void> _completeAuthentication(Map<String, dynamic> tokens) async {
+    await api.saveTokens(tokens);
     await api.dio.put<void>('/me/key',
         data: {'publicKey': await crypto.publicIdentityBase64()});
   }

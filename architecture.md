@@ -326,6 +326,11 @@ Password:
 
 * Hashed
 
+Account identity:
+
+* Username
+* Recovery email is used only for password reset
+
 Transport:
 
 * HTTPS only
@@ -370,8 +375,11 @@ Typical endpoints:
 POST /register
 POST /login
 POST /logout
+POST /forgot-password
+POST /reset-password
 
 GET /me
+PUT /auth/recovery-email
 
 PUT /profile
 
@@ -442,7 +450,7 @@ MUST:
 * HTTPS
 * JWT
 * Password Hash
-* Email Verification
+* Recovery Email Protection
 * Authorization Check
 * Input Validation
 

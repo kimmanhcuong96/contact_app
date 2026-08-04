@@ -9,14 +9,18 @@ class AuthScreen extends ConsumerStatefulWidget {
 }
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
-  final email = TextEditingController();
+  final username = TextEditingController();
+  final recoveryEmail = TextEditingController();
   final password = TextEditingController();
+  final passwordConfirmation = TextEditingController();
   bool register = false;
 
   @override
   void dispose() {
-    email.dispose();
+    username.dispose();
+    recoveryEmail.dispose();
     password.dispose();
+    passwordConfirmation.dispose();
     super.dispose();
   }
 
@@ -44,15 +48,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 24),
                     TextField(
-                        controller: email,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: 'Email')),
+                        controller: username,
+                        autocorrect: false,
+                        decoration: InputDecoration(
+                            labelText: 'Username',
+                            helperText: register
+                                ? '3–32 characters: letters, numbers, . or _'
+                                : 'Existing accounts may temporarily use email')),
+                    if (register) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                          controller: recoveryEmail,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                              labelText: 'Recovery email',
+                              helperText:
+                                  'Only used if you forget your password')),
+                    ],
                     const SizedBox(height: 12),
                     TextField(
                         controller: password,
                         obscureText: true,
                         decoration: const InputDecoration(
                             labelText: 'Password (10+ characters)')),
+                    if (register) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                          controller: passwordConfirmation,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                              labelText: 'Re-enter password')),
+                    ],
                     const SizedBox(height: 16),
                     if (session.hasError)
                       Text(session.error.toString(),
@@ -74,9 +100,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       Wrap(
                         alignment: WrapAlignment.center,
                         children: [
-                          TextButton(
-                              onPressed: _verify,
-                              child: const Text('Verify email')),
                           TextButton(
                               onPressed: _forgot,
                               child: const Text('Forgot password?')),
@@ -100,46 +123,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _submit() async {
     if (register) {
-      try {
-        final result = await ref
-            .read(sessionProvider.notifier)
-            .register(email.text, password.text);
-        if (!mounted) return;
-        final developmentToken = result['developmentToken'];
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(developmentToken == null
-                ? 'Check your email to verify the account.'
-                : 'Development verification token: $developmentToken')));
-        setState(() => register = false);
-      } catch (error) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('$error')));
-        }
+      if (password.text != passwordConfirmation.text) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Passwords do not match.')));
+        return;
       }
+      await ref.read(sessionProvider.notifier).register(username.text,
+          recoveryEmail.text, password.text, passwordConfirmation.text);
     } else {
-      await ref.read(sessionProvider.notifier).login(email.text, password.text);
-    }
-  }
-
-  Future<void> _verify() async {
-    final token = await _ask('Verification token');
-    if (token == null) return;
-    await ref.read(authRepositoryProvider).verifyEmail(token);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email verified. You can sign in.')));
+      await ref
+          .read(sessionProvider.notifier)
+          .login(username.text, password.text);
     }
   }
 
   Future<void> _forgot() async {
-    if (email.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter your email first.')));
-      return;
-    }
+    final email = await _ask('Recovery email');
+    if (email == null || email.isEmpty) return;
     final response =
-        await ref.read(authRepositoryProvider).forgotPassword(email.text);
+        await ref.read(authRepositoryProvider).forgotPassword(email);
     if (!mounted) return;
     final token = await _ask('Reset token',
         initialValue: response['developmentToken'] as String?);

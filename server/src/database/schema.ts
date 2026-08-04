@@ -5,11 +5,12 @@ export const connectionStatus = pgEnum('connection_status', ['pending', 'connect
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  email: text('email').notNull().unique(),
+  username: text('username').notNull().unique(),
+  recoveryEmail: text('recovery_email').notNull().unique(),
+  legacyEmailLogin: boolean('legacy_email_login').notNull().default(false),
   passwordHash: text('password_hash').notNull(),
   publicKey: text('public_key'),
-  status: userStatus('status').notNull().default('pending'),
-  emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+  status: userStatus('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
 });

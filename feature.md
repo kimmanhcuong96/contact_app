@@ -45,14 +45,15 @@ Anyone who wants to exchange and maintain contact information securely.
 
 Features:
 
-* Register with email
-* Verify email
-* Login
+* Register with username and recovery email
+* Re-enter password during registration
+* Login with username
 * Logout
 * Refresh token
 * Forgot password
 * Reset password
 * Change password
+* Change recovery email
 * Multiple devices
 
 ---
@@ -62,7 +63,8 @@ Features:
 Each user has:
 
 * UUID
-* Email
+* Username
+* Recovery email
 * Password
 * Created time
 * Last login
@@ -259,6 +261,7 @@ User settings include:
 * Language
 * Notification
 * Auto Sync
+* Recovery Email
 
 ---
 
@@ -300,7 +303,7 @@ Deleting account removes:
 
 Application provides:
 
-* Email verification
+* Recovery email for password reset
 * Password hashing
 * JWT authentication
 * Refresh token
