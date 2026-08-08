@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/providers.dart';
 import 'core/localization/app_localizations.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/app_shell.dart';
 
@@ -43,18 +44,8 @@ class NexBookApp extends ConsumerWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xff315cfd),
-                brightness: Brightness.light),
-            useMaterial3: true,
-            inputDecorationTheme:
-                const InputDecorationTheme(border: OutlineInputBorder())),
-        darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xff8ea5ff),
-                brightness: Brightness.dark),
-            useMaterial3: true),
+        theme: NexBookTheme.light,
+        darkTheme: NexBookTheme.dark,
         themeMode: ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system,
       );
 }

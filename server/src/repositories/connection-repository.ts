@@ -13,7 +13,12 @@ export class ConnectionRepository {
     return this.db.query.connections.findFirst({ where: or(and(eq(connections.requesterId, a), eq(connections.addresseeId, b)), and(eq(connections.requesterId, b), eq(connections.addresseeId, a))) });
   }
   findUserKey(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id), columns: { id: true, publicKey: true } }); }
-  profileBelongsTo(id: string, ownerId: string) { return this.db.query.profileSets.findFirst({ where: and(eq(profileSets.id, id), eq(profileSets.ownerId, ownerId)), columns: { id: true } }); }
+  findOwnedProfileByClientId(clientId: string, ownerId: string) {
+    return this.db.query.profileSets.findFirst({
+      where: and(eq(profileSets.clientId, clientId), eq(profileSets.ownerId, ownerId)),
+      columns: { id: true },
+    });
+  }
   create(requesterId: string, addresseeId: string, requesterProfileSetId: string, requesterKeyEnvelope: unknown) {
     return this.db.insert(connections).values({ requesterId, addresseeId, requesterProfileSetId, requesterKeyEnvelope }).returning().then((rows) => rows[0]);
   }

@@ -59,7 +59,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.t('settings'))),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        Text(l10n.t('account'), style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          l10n.t('account'),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
         ref.watch(accountProvider).when(
             data: (account) => Column(children: [
                   ListTile(
@@ -82,7 +87,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: const Icon(Icons.refresh)))),
         const Divider(),
         Text(l10n.t('preferences'),
-            style: Theme.of(context).textTheme.titleMedium),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                )),
         SwitchListTile(
             title: Text(l10n.t('notifications')),
             subtitle: Text(l10n.t('notificationsHint')),
@@ -111,7 +118,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: _chooseLanguage),
         const Divider(),
         Text(l10n.t('yourData'),
-            style: Theme.of(context).textTheme.titleMedium),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                )),
         ListTile(
             leading: const Icon(Icons.upload_file),
             title: Text(l10n.t('exportBackup')),

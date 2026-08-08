@@ -106,6 +106,10 @@ class _QrScreenState extends ConsumerState<QrScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                            ),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(20),

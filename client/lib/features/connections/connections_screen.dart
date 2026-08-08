@@ -31,6 +31,7 @@ class ConnectionsScreen extends ConsumerWidget {
               final query =
                   ref.watch(connectionSearchProvider).trim().toLowerCase();
               final filtered = items
+                  .where((item) => item.status != 'pending')
                   .where((item) => (item.profileJson ?? item.peerUserId)
                       .toLowerCase()
                       .contains(query))
@@ -64,8 +65,31 @@ class ConnectionsScreen extends ConsumerWidget {
                               final fields = decoded?['fields'] as Map?;
                               return Card(
                                 child: ListTile(
-                                  leading: const CircleAvatar(
-                                      child: Icon(Icons.person)),
+                                  leading: CircleAvatar(
+                                    backgroundColor: item.status == 'pending'
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .tertiaryContainer
+                                        : item.status == 'connected'
+                                            ? Theme.of(context)
+                                                .colorScheme
+                                                .secondaryContainer
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                    foregroundColor: item.status == 'pending'
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .onTertiaryContainer
+                                        : item.status == 'connected'
+                                            ? Theme.of(context)
+                                                .colorScheme
+                                                .onSecondaryContainer
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                    child: const Icon(Icons.person),
+                                  ),
                                   title: Text(fields?['fullName'] as String? ??
                                       l10n.t('privateContact')),
                                   subtitle: Text(item.status == 'pending'
@@ -77,22 +101,6 @@ class ConnectionsScreen extends ConsumerWidget {
                                     onSelected: (action) =>
                                         _action(context, ref, item, action),
                                     itemBuilder: (_) => [
-                                      if (item.status == 'pending' &&
-                                          item.direction == 'incoming')
-                                        PopupMenuItem(
-                                            value: 'accept',
-                                            child: Text(l10n.t('accept'))),
-                                      if (item.status == 'pending' &&
-                                          item.direction == 'incoming')
-                                        PopupMenuItem(
-                                            value: 'reject',
-                                            child: Text(l10n.t('reject'))),
-                                      if (item.status == 'pending' &&
-                                          item.direction == 'outgoing')
-                                        PopupMenuItem(
-                                            value: 'cancel',
-                                            child:
-                                                Text(l10n.t('cancelRequest'))),
                                       if (item.status == 'connected')
                                         PopupMenuItem(
                                             value: 'assign',
@@ -154,7 +162,7 @@ class ConnectionsScreen extends ConsumerWidget {
         return;
       }
       SharingProfileRow? sharing;
-      if (action == 'accept' || action == 'assign') {
+      if (action == 'assign') {
         sharing = await _chooseSharing(context, ref);
         if (sharing == null) return;
       }

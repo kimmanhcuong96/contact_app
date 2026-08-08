@@ -26,7 +26,13 @@ class ProfileScreen extends ConsumerWidget {
         master.when(
             data: (value) => Card(
                 child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onPrimaryContainer,
+                      child: const Icon(Icons.person),
+                    ),
                     title: Text(value.fields['fullName']?.isNotEmpty == true
                         ? value.fields['fullName']!
                         : l10n.t('addYourDetails')),
@@ -39,7 +45,9 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(height: 20),
         Row(children: [
           Text(l10n.t('sharingProfiles'),
-              style: Theme.of(context).textTheme.titleLarge),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  )),
           const Spacer(),
           IconButton(
               onPressed: () => _editSharing(context, ref),

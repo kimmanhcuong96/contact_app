@@ -28,9 +28,9 @@ export class ConnectionService {
   async request(userId: string, peerUserId: string, profileSetId: string, keyEnvelope: unknown) {
     if (userId === peerUserId) throw new HttpError(400, 'Cannot connect to yourself', 'invalid_peer');
     if (!(await this.repo.findUserKey(peerUserId))) throw new HttpError(404, 'User not found', 'not_found');
-    await this.assertProfileOwner(profileSetId, userId);
+    const profile = await this.ownedProfile(profileSetId, userId);
     if (await this.repo.findPair(userId, peerUserId)) throw new HttpError(409, 'A connection already exists', 'connection_exists');
-    const connection = await this.repo.create(userId, peerUserId, profileSetId, keyEnvelope);
+    const connection = await this.repo.create(userId, peerUserId, profile.id, keyEnvelope);
     await this.notifications.send([peerUserId], 'connection_request', { connectionId: connection.id, requesterId: userId });
     return connection;
   }
@@ -39,8 +39,8 @@ export class ConnectionService {
     const row = await this.owned(userId, id);
     if (action === 'accept') {
       if (row.addresseeId !== userId || row.status !== 'pending' || !profileSetId || !keyEnvelope) throw new HttpError(400, 'This request cannot be accepted', 'invalid_state');
-      await this.assertProfileOwner(profileSetId, userId);
-      const updated = await this.repo.update(id, { status: 'connected', addresseeProfileSetId: profileSetId, addresseeKeyEnvelope: keyEnvelope });
+      const profile = await this.ownedProfile(profileSetId, userId);
+      const updated = await this.repo.update(id, { status: 'connected', addresseeProfileSetId: profile.id, addresseeKeyEnvelope: keyEnvelope });
       await this.notifications.send([row.requesterId], 'connection_accepted', { connectionId: id });
       return updated;
     }
@@ -57,10 +57,10 @@ export class ConnectionService {
     }
     if (action === 'assign') {
       if (!profileSetId || !keyEnvelope || row.status !== 'connected') throw new HttpError(400, 'Profile set and key envelope are required', 'invalid_state');
-      await this.assertProfileOwner(profileSetId, userId);
+      const profile = await this.ownedProfile(profileSetId, userId);
       const values = row.requesterId === userId
-        ? { requesterProfileSetId: profileSetId, requesterKeyEnvelope: keyEnvelope }
-        : { addresseeProfileSetId: profileSetId, addresseeKeyEnvelope: keyEnvelope };
+        ? { requesterProfileSetId: profile.id, requesterKeyEnvelope: keyEnvelope }
+        : { addresseeProfileSetId: profile.id, addresseeKeyEnvelope: keyEnvelope };
       const updated = await this.repo.update(id, values);
       const peer = row.requesterId === userId ? row.addresseeId : row.requesterId;
       await this.notifications.send([peer], 'sharing_profile_changed', { connectionId: id });
@@ -79,7 +79,9 @@ export class ConnectionService {
     if (row.requesterId !== userId && row.addresseeId !== userId) throw new HttpError(403, 'Not allowed', 'forbidden');
     return row;
   }
-  private async assertProfileOwner(id: string, userId: string) {
-    if (!(await this.repo.profileBelongsTo(id, userId))) throw new HttpError(400, 'Profile set does not belong to user', 'invalid_profile_set');
+  private async ownedProfile(clientId: string, userId: string) {
+    const profile = await this.repo.findOwnedProfileByClientId(clientId, userId);
+    if (!profile) throw new HttpError(400, 'Profile set does not belong to user', 'invalid_profile_set');
+    return profile;
   }
 }

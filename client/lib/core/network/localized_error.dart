@@ -45,6 +45,7 @@ String localizedError(AppLocalizations l10n, Object? error) {
         'error.unauthorized',
       'connection_exists' => 'error.connectionExists',
       'invalid_peer' => 'error.invalidPeer',
+      'invalid_profile_set' => 'error.invalidProfileSet',
       'invalid_state' || 'invalid_action' => 'error.invalidState',
       'forbidden' => 'error.forbidden',
       'version_conflict' => 'error.versionConflict',

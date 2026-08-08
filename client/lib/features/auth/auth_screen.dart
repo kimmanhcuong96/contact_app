@@ -31,102 +31,139 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
     final l10n = context.l10n;
+    final theme = Theme.of(context);
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.shield_outlined, size: 48),
-                    const SizedBox(height: 12),
-                    Text('NexBook',
-                        style: Theme.of(context).textTheme.headlineMedium),
-                    const SizedBox(height: 8),
-                    Text(l10n.t('tagline'),
-                        style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: username,
-                      autocorrect: false,
-                      decoration: InputDecoration(
-                        labelText: l10n.t('username'),
-                        helperText: register
-                            ? l10n.t('usernameHint')
-                            : l10n.t('legacyLoginHint'),
-                      ),
-                    ),
-                    if (register) ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: recoveryEmail,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: l10n.t('recoveryEmail'),
-                          helperText: l10n.t('recoveryEmailHint'),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Column(
+            children: [
+              SizedBox(
+                height: 190,
+                child: ColoredBox(
+                  color: theme.brightness == Brightness.light
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.primaryContainer,
+                ),
+              ),
+              Expanded(
+                child: ColoredBox(
+                  color: theme.colorScheme.surfaceContainerLow,
+                ),
+              ),
+            ],
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
+                          child: const Icon(Icons.shield_rounded, size: 32),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: password,
-                      obscureText: true,
-                      decoration:
-                          InputDecoration(labelText: l10n.t('passwordMin')),
+                        const SizedBox(height: 12),
+                        Text(
+                          'NexBook',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(l10n.t('tagline'),
+                            style: Theme.of(context).textTheme.bodyMedium),
+                        const SizedBox(height: 24),
+                        TextField(
+                          controller: username,
+                          autocorrect: false,
+                          decoration: InputDecoration(
+                            labelText: l10n.t('username'),
+                            helperText: register
+                                ? l10n.t('usernameHint')
+                                : l10n.t('legacyLoginHint'),
+                          ),
+                        ),
+                        if (register) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: recoveryEmail,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: l10n.t('recoveryEmail'),
+                              helperText: l10n.t('recoveryEmailHint'),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: password,
+                          obscureText: true,
+                          decoration:
+                              InputDecoration(labelText: l10n.t('passwordMin')),
+                        ),
+                        if (register) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: passwordConfirmation,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                                labelText: l10n.t('reenterPassword')),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        if (session.hasError)
+                          Text(
+                            localizedError(l10n, session.error),
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.error),
+                          ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: session.isLoading ? null : _submit,
+                            child: session.isLoading
+                                ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(register
+                                    ? l10n.t('createAccount')
+                                    : l10n.t('signIn')),
+                          ),
+                        ),
+                        if (!register)
+                          TextButton(
+                            onPressed: _forgot,
+                            child: Text(l10n.t('forgotPassword')),
+                          ),
+                        TextButton(
+                          onPressed: () => setState(() => register = !register),
+                          child: Text(register
+                              ? l10n.t('alreadyHaveAccount')
+                              : l10n.t('createAnAccount')),
+                        ),
+                      ],
                     ),
-                    if (register) ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: passwordConfirmation,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                            labelText: l10n.t('reenterPassword')),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    if (session.hasError)
-                      Text(
-                        localizedError(l10n, session.error),
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error),
-                      ),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: session.isLoading ? null : _submit,
-                        child: session.isLoading
-                            ? const SizedBox.square(
-                                dimension: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(register
-                                ? l10n.t('createAccount')
-                                : l10n.t('signIn')),
-                      ),
-                    ),
-                    if (!register)
-                      TextButton(
-                        onPressed: _forgot,
-                        child: Text(l10n.t('forgotPassword')),
-                      ),
-                    TextButton(
-                      onPressed: () => setState(() => register = !register),
-                      child: Text(register
-                          ? l10n.t('alreadyHaveAccount')
-                          : l10n.t('createAnAccount')),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

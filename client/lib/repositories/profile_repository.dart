@@ -74,9 +74,17 @@ class ProfileRepository {
 
   Future<void> sync() async {
     final master = await database.watchMasterProfile().first;
-    if (master == null) return;
-    final fields = MasterProfile.decode(master.json).fields;
-    for (final row in await database.dirtyProfiles()) {
+    final fields = master == null
+        ? const <String, String>{}
+        : MasterProfile.decode(master.json).fields;
+    final remoteResponse =
+        await api.dio.get<Map<String, dynamic>>('/profile-sets');
+    final remoteItems = remoteResponse.data?['items'] as List? ?? const [];
+    final remoteClientIds =
+        remoteItems.map((item) => (item as Map)['clientId'] as String).toSet();
+    final localRows = await database.select(database.sharingProfiles).get();
+    for (final row in localRows
+        .where((row) => row.dirty || !remoteClientIds.contains(row.id))) {
       final sharing = SharingProfile.decode(row.json);
       final view = <String, dynamic>{
         'fields': {
