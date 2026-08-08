@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import type { Database } from '../database/client';
 import { connections, devices, profileSets, users } from '../database/schema';
 
@@ -13,6 +13,10 @@ export class ConnectionRepository {
     return this.db.query.connections.findFirst({ where: or(and(eq(connections.requesterId, a), eq(connections.addresseeId, b)), and(eq(connections.requesterId, b), eq(connections.addresseeId, a))) });
   }
   findUserKey(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id), columns: { id: true, publicKey: true } }); }
+  findUsernames(ids: string[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, ids));
+  }
   findOwnedProfileByClientId(clientId: string, ownerId: string) {
     return this.db.query.profileSets.findFirst({
       where: and(eq(profileSets.clientId, clientId), eq(profileSets.ownerId, ownerId)),

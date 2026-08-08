@@ -17,13 +17,6 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int index = 0;
-  static const screens = [
-    QrScreen(),
-    ProfileScreen(),
-    ConnectionsScreen(),
-    ConnectionRequestsScreen(),
-    SettingsScreen()
-  ];
   @override
   Widget build(BuildContext context) {
     ref.watch(syncServiceProvider);
@@ -35,6 +28,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         SnackBar(content: Text(localizedError(context.l10n, error))),
       );
     });
+    final screens = [
+      QrScreen(onConnectionCreated: () => setState(() => index = 3)),
+      const ProfileScreen(),
+      const ConnectionsScreen(),
+      const ConnectionRequestsScreen(),
+      const SettingsScreen(),
+    ];
     return Scaffold(
       body: IndexedStack(index: index, children: screens),
       bottomNavigationBar: NavigationBar(

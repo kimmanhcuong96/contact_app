@@ -7,6 +7,7 @@ import '../../core/database/app_database.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/network/localized_error.dart';
 import '../../core/providers.dart';
+import 'contact_detail_screen.dart';
 
 final connectionSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 
@@ -32,9 +33,10 @@ class ConnectionsScreen extends ConsumerWidget {
                   ref.watch(connectionSearchProvider).trim().toLowerCase();
               final filtered = items
                   .where((item) => item.status != 'pending')
-                  .where((item) => (item.profileJson ?? item.peerUserId)
-                      .toLowerCase()
-                      .contains(query))
+                  .where((item) =>
+                      '${item.profileJson ?? ''} ${item.peerUsername ?? ''} ${item.peerUserId}'
+                          .toLowerCase()
+                          .contains(query))
                   .toList()
                 ..sort((a, b) => (a.profileJson ?? a.peerUserId)
                     .compareTo(b.profileJson ?? b.peerUserId));
@@ -91,12 +93,20 @@ class ConnectionsScreen extends ConsumerWidget {
                                     child: const Icon(Icons.person),
                                   ),
                                   title: Text(fields?['fullName'] as String? ??
-                                      l10n.t('privateContact')),
-                                  subtitle: Text(item.status == 'pending'
-                                      ? l10n.t('connectionRequest',
-                                          {'id': item.peerUserId})
-                                      : fields?['company'] as String? ??
-                                          item.peerUserId),
+                                      (item.peerUsername == null
+                                          ? l10n.t('privateContact')
+                                          : '@${item.peerUsername}')),
+                                  subtitle: Text(
+                                      fields?['company'] as String? ??
+                                          (item.peerUsername == null
+                                              ? item.peerUserId
+                                              : '@${item.peerUsername}')),
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          ContactDetailScreen(contact: item),
+                                    ),
+                                  ),
                                   trailing: PopupMenuButton<String>(
                                     onSelected: (action) =>
                                         _action(context, ref, item, action),

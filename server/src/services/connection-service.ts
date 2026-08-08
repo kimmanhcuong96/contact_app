@@ -8,13 +8,17 @@ export class ConnectionService {
 
   async list(userId: string) {
     const rows = await this.repo.list(userId);
+    const peerIds = rows.map((row) => row.requesterId === userId ? row.addresseeId : row.requesterId);
+    const usernames = new Map((await this.repo.findUsernames(peerIds)).map((user) => [user.id, user.username]));
     return Promise.all(rows.map(async (row) => {
       const outgoing = row.requesterId === userId;
+      const peerUserId = outgoing ? row.addresseeId : row.requesterId;
       const sharedSetId = outgoing ? row.addresseeProfileSetId : row.requesterProfileSetId;
       const sharedSet = row.status === 'connected' && sharedSetId ? await this.profiles.findById(sharedSetId) : undefined;
       return {
         id: row.id,
-        peerUserId: outgoing ? row.addresseeId : row.requesterId,
+        peerUserId,
+        peerUsername: usernames.get(peerUserId) ?? null,
         direction: outgoing ? 'outgoing' : 'incoming',
         status: row.status,
         assignedProfileSetId: outgoing ? row.requesterProfileSetId : row.addresseeProfileSetId,

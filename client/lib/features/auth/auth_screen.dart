@@ -151,7 +151,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             child: Text(l10n.t('forgotPassword')),
                           ),
                         TextButton(
-                          onPressed: () => setState(() => register = !register),
+                          onPressed: _switchAuthMode,
                           child: Text(register
                               ? l10n.t('alreadyHaveAccount')
                               : l10n.t('createAnAccount')),
@@ -169,6 +169,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _submit() async {
+    _clearMessages();
     final l10n = context.l10n;
     final normalizedUsername = username.text.trim();
     if (normalizedUsername.isEmpty) {
@@ -213,10 +214,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       await ref
           .read(sessionProvider.notifier)
           .login(username.text, password.text);
+      if (ref.read(sessionProvider).hasError) password.clear();
     }
   }
 
   Future<void> _forgot() async {
+    _clearMessages();
     final l10n = context.l10n;
     final email = await _ask(l10n.t('recoveryEmail'));
     if (email == null || email.isEmpty) return;
@@ -274,6 +277,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _isValidEmail(String value) =>
       RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim());
 
-  void _show(String message) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(message)));
+  void _switchAuthMode() {
+    _clearMessages();
+    setState(() => register = !register);
+  }
+
+  void _clearMessages() {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ref.read(sessionProvider.notifier).clearMessage();
+  }
+
+  void _show(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 }

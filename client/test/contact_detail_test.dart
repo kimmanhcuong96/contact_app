@@ -1,0 +1,38 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:nexbook/core/database/app_database.dart';
+import 'package:nexbook/core/localization/app_localizations.dart';
+import 'package:nexbook/features/connections/contact_detail_screen.dart';
+
+void main() {
+  testWidgets('shows the decrypted fields shared by a contact', (tester) async {
+    final contact = ConnectedProfileRow(
+      connectionId: 'connection-id',
+      peerUserId: 'peer-id',
+      peerUsername: 'peer.user',
+      status: 'connected',
+      direction: 'incoming',
+      profileJson: '{"fields":{"fullName":"Peer Name","phone":"0901234567"}}',
+      version: 1,
+      updatedAt: DateTime(2026),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('en'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: ContactDetailScreen(contact: contact),
+    ));
+
+    expect(find.text('Peer Name'), findsNWidgets(2));
+    expect(find.text('@peer.user'), findsOneWidget);
+    expect(find.text('0901234567'), findsOneWidget);
+    expect(find.text('Phone'), findsOneWidget);
+  });
+}

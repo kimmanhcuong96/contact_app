@@ -27,6 +27,7 @@ class SharingProfiles extends Table {
 class ConnectedProfiles extends Table {
   TextColumn get connectionId => text()();
   TextColumn get peerUserId => text()();
+  TextColumn get peerUsername => text().nullable()();
   TextColumn get status => text()();
   TextColumn get direction => text()();
   TextColumn get profileJson => text().nullable()();
@@ -75,7 +76,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -83,6 +84,10 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (migrator, from, to) async {
           if (from < 2) {
             await migrator.createTable(pendingConnectionActions);
+          }
+          if (from < 3) {
+            await migrator.addColumn(
+                connectedProfiles, connectedProfiles.peerUsername);
           }
         },
       );

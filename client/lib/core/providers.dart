@@ -127,6 +127,10 @@ class SessionController extends AsyncNotifier<bool> {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(false);
   }
+
+  void clearMessage() {
+    if (state.hasError) state = const AsyncData(false);
+  }
 }
 
 final sessionProvider =

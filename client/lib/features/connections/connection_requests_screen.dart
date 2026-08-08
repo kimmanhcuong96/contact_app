@@ -215,7 +215,9 @@ class _RequestTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item.peerUserId,
+                        item.peerUsername == null
+                            ? item.peerUserId
+                            : '@${item.peerUsername}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,

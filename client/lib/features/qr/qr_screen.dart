@@ -40,7 +40,9 @@ String? decodeQrImage(Uint8List bytes) {
 }
 
 class QrScreen extends ConsumerStatefulWidget {
-  const QrScreen({super.key});
+  const QrScreen({super.key, required this.onConnectionCreated});
+
+  final VoidCallback onConnectionCreated;
 
   @override
   ConsumerState<QrScreen> createState() => _QrScreenState();
@@ -311,7 +313,11 @@ class _QrScreenState extends ConsumerState<QrScreen> {
       final sharing = await _chooseSharing();
       if (sharing == null) return;
       await ref.read(connectionRepositoryProvider).request(peerId, sharing);
-      if (mounted) _showMessage(context.l10n.t('connectionQueued'));
+      if (mounted) {
+        _showMessage(context.l10n.t('connectionQueued'));
+        setState(() => _mode = _QrMode.mine);
+        widget.onConnectionCreated();
+      }
     } catch (error) {
       if (mounted) _showMessage(localizedError(context.l10n, error));
     } finally {

@@ -5,6 +5,36 @@ import { ConnectionService } from '../src/services/connection-service';
 import type { ProfileRepository } from '../src/repositories/profile-repository';
 
 describe('ConnectionService profile identifiers', () => {
+  it('includes the peer username when listing connections', async () => {
+    const repo = {
+      list: vi.fn().mockResolvedValue([
+        {
+          id: 'connection-id',
+          requesterId: 'user-id',
+          addresseeId: 'peer-id',
+          status: 'pending',
+          requesterProfileSetId: 'profile-id',
+          addresseeProfileSetId: null,
+          requesterKeyEnvelope: {},
+          addresseeKeyEnvelope: null,
+          updatedAt: new Date(),
+        },
+      ]),
+      findUsernames: vi
+          .fn()
+          .mockResolvedValue([{ id: 'peer-id', username: 'peer.user' }]),
+    } as unknown as ConnectionRepository;
+    const service = new ConnectionService(
+      repo,
+      {} as ProfileRepository,
+      {} as NotificationService,
+    );
+
+    await expect(service.list('user-id')).resolves.toMatchObject([
+      { peerUserId: 'peer-id', peerUsername: 'peer.user' },
+    ]);
+  });
+
   it('resolves the client profile id before creating a connection', async () => {
     const create = vi.fn().mockResolvedValue({ id: 'connection-id' });
     const repo = {

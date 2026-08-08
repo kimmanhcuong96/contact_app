@@ -173,6 +173,7 @@ class ConnectionRepository {
             ConnectedProfilesCompanion.insert(
               connectionId: connectionId,
               peerUserId: peerUserId,
+              peerUsername: Value(item['peerUsername'] as String?),
               status: item['status'] as String,
               direction: item['direction'] as String,
               profileJson: Value(profileJson),
