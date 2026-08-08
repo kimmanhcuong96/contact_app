@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_localizations.dart';
@@ -26,11 +25,6 @@ class ConnectionsScreen extends ConsumerWidget {
             icon: const Icon(Icons.sync),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _add(context, ref),
-        icon: const Icon(Icons.qr_code_scanner),
-        label: Text(l10n.t('scan')),
       ),
       body: ref.watch(connectionsProvider).when(
             data: (items) {
@@ -152,19 +146,6 @@ class ConnectionsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _add(BuildContext context, WidgetRef ref) async {
-    final peerId = await context.push<String>('/scan');
-    if (peerId == null || !context.mounted) return;
-    final sharing = await _chooseSharing(context, ref);
-    if (sharing == null) return;
-    try {
-      await ref.read(profileRepositoryProvider).sync();
-      await ref.read(connectionRepositoryProvider).request(peerId, sharing);
-    } catch (error) {
-      if (context.mounted) _showError(context, error);
-    }
-  }
-
   Future<void> _action(BuildContext context, WidgetRef ref,
       ConnectedProfileRow item, String action) async {
     try {
@@ -176,7 +157,6 @@ class ConnectionsScreen extends ConsumerWidget {
       if (action == 'accept' || action == 'assign') {
         sharing = await _chooseSharing(context, ref);
         if (sharing == null) return;
-        await ref.read(profileRepositoryProvider).sync();
       }
       await ref.read(connectionRepositoryProvider).act(
             item.connectionId,

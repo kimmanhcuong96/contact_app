@@ -44,8 +44,25 @@ class AppSettings extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(
-    tables: [MasterProfiles, SharingProfiles, ConnectedProfiles, AppSettings])
+@DataClassName('PendingConnectionActionRow')
+class PendingConnectionActions extends Table {
+  TextColumn get id => text()();
+  TextColumn get operation => text()();
+  TextColumn get connectionId => text().nullable()();
+  TextColumn get peerUserId => text().nullable()();
+  TextColumn get profileSetId => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [
+  MasterProfiles,
+  SharingProfiles,
+  ConnectedProfiles,
+  AppSettings,
+  PendingConnectionActions
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase()
       : super(driftDatabase(
@@ -55,8 +72,20 @@ class AppDatabase extends _$AppDatabase {
             driftWorker: Uri.parse('drift_worker.js'),
           ),
         ));
+  AppDatabase.forTesting(super.executor);
+
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (migrator) => migrator.createAll(),
+        onUpgrade: (migrator, from, to) async {
+          if (from < 2) {
+            await migrator.createTable(pendingConnectionActions);
+          }
+        },
+      );
 
   Stream<MasterProfileRow?> watchMasterProfile() =>
       select(masterProfiles).watchSingleOrNull();
@@ -94,10 +123,45 @@ class AppDatabase extends _$AppDatabase {
         .write(const SharingProfilesCompanion(dirty: Value(false)));
   }
 
+  Future<void> enqueueConnectionAction({
+    required String id,
+    required String operation,
+    String? connectionId,
+    String? peerUserId,
+    String? profileSetId,
+  }) =>
+      into(pendingConnectionActions).insert(
+        PendingConnectionActionsCompanion.insert(
+          id: id,
+          operation: operation,
+          connectionId: Value(connectionId),
+          peerUserId: Value(peerUserId),
+          profileSetId: Value(profileSetId),
+          createdAt: DateTime.now(),
+        ),
+      );
+
+  Future<List<PendingConnectionActionRow>> pendingConnectionQueue() =>
+      (select(pendingConnectionActions)
+            ..orderBy([(row) => OrderingTerm.asc(row.createdAt)]))
+          .get();
+
+  Future<void> removePendingConnectionAction(String id) =>
+      (delete(pendingConnectionActions)..where((row) => row.id.equals(id)))
+          .go();
+
+  Future<void> removePendingRequest(String peerUserId) =>
+      (delete(pendingConnectionActions)
+            ..where((row) =>
+                row.operation.equals('request') &
+                row.peerUserId.equals(peerUserId)))
+          .go();
+
   Future<void> clearAll() => transaction(() async {
         await delete(connectedProfiles).go();
         await delete(sharingProfiles).go();
         await delete(masterProfiles).go();
         await delete(appSettings).go();
+        await delete(pendingConnectionActions).go();
       });
 }

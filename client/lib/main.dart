@@ -6,7 +6,6 @@ import 'core/providers.dart';
 import 'core/localization/app_localizations.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/app_shell.dart';
-import 'features/qr/scan_screen.dart';
 
 void main() => runApp(const ProviderScope(child: NexBookApp()));
 
@@ -23,7 +22,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const AuthScreen()),
       GoRoute(path: '/home', builder: (_, __) => const AppShell()),
-      GoRoute(path: '/scan', builder: (_, __) => const ScanScreen()),
     ],
   );
   ref.onDispose(router.dispose);

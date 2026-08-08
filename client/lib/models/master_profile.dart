@@ -1,23 +1,24 @@
 import 'dart:convert';
 
-class MasterProfile {
-  const MasterProfile({required this.fields, this.avatarBase64});
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  final Map<String, String> fields;
-  final String? avatarBase64;
+part 'master_profile.freezed.dart';
+part 'master_profile.g.dart';
 
-  MasterProfile copyWith({Map<String, String>? fields, String? avatarBase64}) =>
-      MasterProfile(
-          fields: fields ?? this.fields,
-          avatarBase64: avatarBase64 ?? this.avatarBase64);
+@freezed
+class MasterProfile with _$MasterProfile {
+  const MasterProfile._();
 
-  Map<String, dynamic> toJson() =>
-      {'fields': fields, if (avatarBase64 != null) 'avatar': avatarBase64};
-  factory MasterProfile.fromJson(Map<String, dynamic> json) => MasterProfile(
-        fields: Map<String, String>.from(json['fields'] as Map? ?? const {}),
-        avatarBase64: json['avatar'] as String?,
-      );
+  const factory MasterProfile({
+    required Map<String, String> fields,
+    @JsonKey(name: 'avatar') String? avatarBase64,
+  }) = _MasterProfile;
+
+  factory MasterProfile.fromJson(Map<String, dynamic> json) =>
+      _$MasterProfileFromJson(json);
+
   String encode() => jsonEncode(toJson());
+
   factory MasterProfile.decode(String value) =>
       MasterProfile.fromJson(jsonDecode(value) as Map<String, dynamic>);
 

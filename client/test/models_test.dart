@@ -7,6 +7,11 @@ void main() {
     const profile = MasterProfile(
         fields: {'fullName': 'Ada', 'customField': 'future-safe'});
     expect(MasterProfile.decode(profile.encode()).fields, profile.fields);
+    expect(MasterProfile.decode(profile.encode()), profile);
+    expect(
+      () => profile.fields['fullName'] = 'Grace',
+      throwsUnsupportedError,
+    );
   });
 
   test('sharing profile round-trips visibility policy', () {

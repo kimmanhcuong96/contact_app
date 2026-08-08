@@ -96,16 +96,13 @@ class ProfileScreen extends ConsumerWidget {
 
   Future<void> _sync(BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(profileRepositoryProvider).sync();
+      await ref.read(syncServiceProvider).syncNow();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.l10n.t('profilesSynced'))));
       }
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.t('syncQueued'))));
-      }
+      // SyncService publishes the localized failure through the app shell.
     }
   }
 

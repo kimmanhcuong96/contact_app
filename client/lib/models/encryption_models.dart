@@ -1,31 +1,28 @@
-class EncryptedEnvelope {
-  const EncryptedEnvelope({required this.nonce, required this.ciphertext});
-  final String nonce;
-  final String ciphertext;
-  Map<String, dynamic> toJson() =>
-      {'algorithm': 'AES-256-GCM', 'nonce': nonce, 'ciphertext': ciphertext};
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'encryption_models.freezed.dart';
+part 'encryption_models.g.dart';
+
+@freezed
+class EncryptedEnvelope with _$EncryptedEnvelope {
+  const factory EncryptedEnvelope({
+    @Default('AES-256-GCM') String algorithm,
+    required String nonce,
+    required String ciphertext,
+  }) = _EncryptedEnvelope;
+
   factory EncryptedEnvelope.fromJson(Map<String, dynamic> json) =>
-      EncryptedEnvelope(
-          nonce: json['nonce'] as String,
-          ciphertext: json['ciphertext'] as String);
+      _$EncryptedEnvelopeFromJson(json);
 }
 
-class WrappedKeyEnvelope {
-  const WrappedKeyEnvelope(
-      {required this.ephemeralPublicKey,
-      required this.nonce,
-      required this.ciphertext});
-  final String ephemeralPublicKey;
-  final String nonce;
-  final String ciphertext;
-  Map<String, dynamic> toJson() => {
-        'ephemeralPublicKey': ephemeralPublicKey,
-        'nonce': nonce,
-        'ciphertext': ciphertext
-      };
+@freezed
+class WrappedKeyEnvelope with _$WrappedKeyEnvelope {
+  const factory WrappedKeyEnvelope({
+    required String ephemeralPublicKey,
+    required String nonce,
+    required String ciphertext,
+  }) = _WrappedKeyEnvelope;
+
   factory WrappedKeyEnvelope.fromJson(Map<String, dynamic> json) =>
-      WrappedKeyEnvelope(
-          ephemeralPublicKey: json['ephemeralPublicKey'] as String,
-          nonce: json['nonce'] as String,
-          ciphertext: json['ciphertext'] as String);
+      _$WrappedKeyEnvelopeFromJson(json);
 }

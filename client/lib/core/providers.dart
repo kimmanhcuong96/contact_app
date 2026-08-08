@@ -34,7 +34,8 @@ final profileRepositoryProvider = Provider((ref) => ProfileRepository(
 final connectionRepositoryProvider = Provider((ref) => ConnectionRepository(
     ref.watch(databaseProvider),
     ref.watch(apiClientProvider),
-    ref.watch(cryptoProvider)));
+    ref.watch(cryptoProvider),
+    ref.watch(profileRepositoryProvider)));
 final syncServiceProvider = Provider((ref) {
   final value = SyncService(ref.watch(profileRepositoryProvider),
       ref.watch(connectionRepositoryProvider), ref.watch(databaseProvider))
@@ -42,6 +43,8 @@ final syncServiceProvider = Provider((ref) {
   ref.onDispose(value.dispose);
   return value;
 });
+final syncStatusProvider =
+    StreamProvider((ref) => ref.watch(syncServiceProvider).statuses);
 final notificationRegistrationProvider = Provider((ref) {
   final value = NotificationRegistrationService(ref.watch(apiClientProvider))
     ..start();
