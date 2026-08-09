@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +10,7 @@ import 'package:nexbook/core/database/app_database.dart';
 import 'package:nexbook/core/network/api_client.dart';
 import 'package:nexbook/core/security/crypto_service.dart';
 import 'package:nexbook/repositories/profile_repository.dart';
+import 'package:nexbook/repositories/connection_repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,44 @@ void main() {
     expect((await database.select(database.sharingProfiles).getSingle()).dirty,
         isFalse);
   });
+
+  test('does not delete a sharing profile assigned to a contact', () async {
+    const storage = FlutterSecureStorage();
+    final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
+    final profileId = 'b87f598f-a41a-4b04-aa48-bf6b2310d024';
+    await database.into(database.connectedProfiles).insert(
+          ConnectedProfilesCompanion.insert(
+            connectionId: 'connection-id',
+            peerUserId: 'peer-id',
+            assignedProfileId: Value(profileId),
+            status: 'connected',
+            direction: 'outgoing',
+            updatedAt: DateTime(2026),
+          ),
+        );
+
+    await expectLater(
+      ProfileRepository(database, api, CryptoService(storage))
+          .deleteSharing(profileId),
+      throwsA(isA<SharingProfileInUseException>()),
+    );
+  });
+
+  test('keeps syncing when one connected profile cannot be decrypted',
+      () async {
+    const storage = FlutterSecureStorage();
+    final crypto = CryptoService(storage);
+    final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
+    api.dio.httpClientAdapter = _ConnectionAdapter();
+    final profiles = ProfileRepository(database, api, crypto);
+
+    await ConnectionRepository(database, api, crypto, profiles).sync();
+
+    final contact =
+        await database.select(database.connectedProfiles).getSingle();
+    expect(contact.peerUsername, 'peer.user');
+    expect(jsonDecode(contact.profileJson!)['error'], 'decryption_failed');
+  });
 }
 
 class _RecordingAdapter implements HttpClientAdapter {
@@ -66,6 +105,51 @@ class _RecordingAdapter implements HttpClientAdapter {
     final body = options.method == 'GET' ? '{"items":[]}' : '{}';
     return ResponseBody.fromString(
       body,
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _ConnectionAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      jsonEncode({
+        'items': [
+          {
+            'id': 'connection-id',
+            'peerUserId': 'peer-id',
+            'peerUsername': 'peer.user',
+            'assignedProfileClientId': null,
+            'status': 'connected',
+            'direction': 'incoming',
+            'keyEnvelope': {
+              'ephemeralPublicKey': 'invalid',
+              'nonce': 'invalid',
+              'ciphertext': 'invalid',
+            },
+            'profile': {
+              'version': 1,
+              'encryptedBlob': {
+                'algorithm': 'AES-256-GCM',
+                'nonce': 'invalid',
+                'ciphertext': 'invalid',
+              },
+            },
+            'updatedAt': '2026-08-09T00:00:00.000Z',
+          }
+        ],
+      }),
       200,
       headers: {
         Headers.contentTypeHeader: ['application/json'],

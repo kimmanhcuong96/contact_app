@@ -82,9 +82,19 @@ class ProfileScreen extends ConsumerWidget {
                                             version: 1));
                                   }
                                   if (action == 'delete') {
-                                    await ref
-                                        .read(profileRepositoryProvider)
-                                        .deleteSharing(item.id);
+                                    try {
+                                      await ref
+                                          .read(profileRepositoryProvider)
+                                          .deleteSharing(item.id);
+                                    } catch (error) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(SnackBar(
+                                          content: Text(localizedError(
+                                              context.l10n, error)),
+                                        ));
+                                      }
+                                    }
                                   }
                                 },
                                 itemBuilder: (_) => [

@@ -14,14 +14,16 @@ export class ConnectionService {
       const outgoing = row.requesterId === userId;
       const peerUserId = outgoing ? row.addresseeId : row.requesterId;
       const sharedSetId = outgoing ? row.addresseeProfileSetId : row.requesterProfileSetId;
+      const assignedSetId = outgoing ? row.requesterProfileSetId : row.addresseeProfileSetId;
       const sharedSet = row.status === 'connected' && sharedSetId ? await this.profiles.findById(sharedSetId) : undefined;
+      const assignedSet = assignedSetId ? await this.profiles.findById(assignedSetId) : undefined;
       return {
         id: row.id,
         peerUserId,
         peerUsername: usernames.get(peerUserId) ?? null,
         direction: outgoing ? 'outgoing' : 'incoming',
         status: row.status,
-        assignedProfileSetId: outgoing ? row.requesterProfileSetId : row.addresseeProfileSetId,
+        assignedProfileClientId: assignedSet?.clientId ?? null,
         keyEnvelope: outgoing ? row.addresseeKeyEnvelope : row.requesterKeyEnvelope,
         profile: sharedSet ? { encryptedBlob: sharedSet.encryptedBlob, version: sharedSet.version, updatedAt: sharedSet.updatedAt } : null,
         updatedAt: row.updatedAt,
@@ -33,7 +35,13 @@ export class ConnectionService {
     if (userId === peerUserId) throw new HttpError(400, 'Cannot connect to yourself', 'invalid_peer');
     if (!(await this.repo.findUserKey(peerUserId))) throw new HttpError(404, 'User not found', 'not_found');
     const profile = await this.ownedProfile(profileSetId, userId);
-    if (await this.repo.findPair(userId, peerUserId)) throw new HttpError(409, 'A connection already exists', 'connection_exists');
+    const existing = await this.repo.findPair(userId, peerUserId);
+    if (existing) {
+      if (!['connected', 'disabled'].includes(existing.status)) throw new HttpError(409, 'A connection request is already pending', 'connection_exists');
+      const refreshed = await this.refresh(existing, userId, profile.id, keyEnvelope);
+      await this.notifications.send([peerUserId], 'connection_refreshed', { connectionId: existing.id, userId });
+      return refreshed;
+    }
     const connection = await this.repo.create(userId, peerUserId, profile.id, keyEnvelope);
     await this.notifications.send([peerUserId], 'connection_request', { connectionId: connection.id, requesterId: userId });
     return connection;
@@ -70,6 +78,14 @@ export class ConnectionService {
       await this.notifications.send([peer], 'sharing_profile_changed', { connectionId: id });
       return updated;
     }
+    if (action === 'reconnect') {
+      if (!profileSetId || !keyEnvelope || !['connected', 'disabled'].includes(row.status)) throw new HttpError(400, 'Profile set and key envelope are required', 'invalid_state');
+      const profile = await this.ownedProfile(profileSetId, userId);
+      const updated = await this.refresh(row, userId, profile.id, keyEnvelope);
+      const peer = row.requesterId === userId ? row.addresseeId : row.requesterId;
+      await this.notifications.send([peer], 'connection_refreshed', { connectionId: id, userId });
+      return updated;
+    }
     throw new HttpError(400, 'Unsupported connection action', 'invalid_action');
   }
 
@@ -87,5 +103,11 @@ export class ConnectionService {
     const profile = await this.repo.findOwnedProfileByClientId(clientId, userId);
     if (!profile) throw new HttpError(400, 'Profile set does not belong to user', 'invalid_profile_set');
     return profile;
+  }
+  private refresh(row: Awaited<ReturnType<ConnectionRepository['find']>> & {}, userId: string, profileId: string, keyEnvelope: unknown) {
+    const values = row.requesterId === userId
+      ? { status: 'connected' as const, requesterProfileSetId: profileId, requesterKeyEnvelope: keyEnvelope }
+      : { status: 'connected' as const, addresseeProfileSetId: profileId, addresseeKeyEnvelope: keyEnvelope };
+    return this.repo.update(row.id, values);
   }
 }

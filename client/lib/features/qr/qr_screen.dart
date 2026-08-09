@@ -312,9 +312,11 @@ class _QrScreenState extends ConsumerState<QrScreen> {
     try {
       final sharing = await _chooseSharing();
       if (sharing == null) return;
-      await ref.read(connectionRepositoryProvider).request(peerId, sharing);
+      final refreshed =
+          await ref.read(connectionRepositoryProvider).request(peerId, sharing);
       if (mounted) {
-        _showMessage(context.l10n.t('connectionQueued'));
+        _showMessage(context.l10n
+            .t(refreshed ? 'connectionRefreshed' : 'connectionQueued'));
         setState(() => _mode = _QrMode.mine);
         widget.onConnectionCreated();
       }

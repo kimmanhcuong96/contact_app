@@ -6,6 +6,18 @@ import 'package:nexbook/core/localization/app_localizations.dart';
 import 'package:nexbook/features/connections/contact_detail_screen.dart';
 
 void main() {
+  test('maps shared contact fields to actionable URIs', () {
+    expect(contactActionUri('phone', '+84 901 234 567').toString(),
+        'tel:+84%20901%20234%20567');
+    expect(contactActionUri('email', 'person@example.com').toString(),
+        'mailto:person@example.com');
+    expect(contactActionUri('facebook', '@nexbook').toString(),
+        'https://facebook.com/nexbook');
+    expect(contactActionUri('website', 'example.com').toString(),
+        'https://example.com');
+    expect(contactActionUri('notes', 'Private note'), isNull);
+  });
+
   testWidgets('shows the decrypted fields shared by a contact', (tester) async {
     final contact = ConnectedProfileRow(
       connectionId: 'connection-id',

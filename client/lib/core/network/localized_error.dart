@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 import '../localization/app_localizations.dart';
+import '../../repositories/profile_repository.dart';
 
 String localizedError(AppLocalizations l10n, Object? error) {
+  if (error is SharingProfileInUseException) {
+    return l10n.t('error.profileInUse', {'count': error.connectionCount});
+  }
   if (error is DioException) {
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.sendTimeout ||

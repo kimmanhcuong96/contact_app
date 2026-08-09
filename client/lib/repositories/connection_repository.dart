@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/database/app_database.dart';
@@ -22,7 +23,21 @@ class ConnectionRepository {
   Stream<List<ConnectedProfileRow>> watchConnections() =>
       database.select(database.connectedProfiles).watch();
 
-  Future<void> request(String peerUserId, SharingProfileRow sharing) async {
+  Future<bool> request(String peerUserId, SharingProfileRow sharing) async {
+    final existing = await (database.select(database.connectedProfiles)
+          ..where((row) =>
+              row.peerUserId.equals(peerUserId) &
+              row.status.isIn(const ['connected', 'disabled'])))
+        .getSingleOrNull();
+    if (existing != null) {
+      await act(
+        existing.connectionId,
+        'reconnect',
+        sharing: sharing,
+        peerUserId: peerUserId,
+      );
+      return true;
+    }
     final actionId = _uuid.v4();
     await database.transaction(() async {
       await database.enqueueConnectionAction(
@@ -35,6 +50,7 @@ class ConnectionRepository {
             ConnectedProfilesCompanion.insert(
               connectionId: 'local:$actionId',
               peerUserId: peerUserId,
+              assignedProfileId: Value(sharing.id),
               status: 'pending',
               direction: 'outgoing',
               updatedAt: DateTime.now(),
@@ -42,6 +58,12 @@ class ConnectionRepository {
           );
     });
     await _flushAndPullWhenAvailable(syncProfiles: true);
+    final refreshed = await (database.select(database.connectedProfiles)
+          ..where((row) =>
+              row.peerUserId.equals(peerUserId) &
+              row.status.equals('connected')))
+        .getSingleOrNull();
+    return refreshed != null;
   }
 
   Future<void> act(
@@ -66,7 +88,36 @@ class ConnectionRepository {
         peerUserId: peerUserId,
         profileSetId: sharing?.id,
       );
-      await _applyOptimisticAction(connectionId, action);
+      await _applyOptimisticAction(
+        connectionId,
+        action,
+        assignedProfileId: sharing?.id,
+      );
+    });
+    await _flushAndPullWhenAvailable(syncProfiles: sharing != null);
+  }
+
+  Future<void> actMany(
+    List<ConnectedProfileRow> connections,
+    String action, {
+    SharingProfileRow? sharing,
+  }) async {
+    if (connections.isEmpty) return;
+    await database.transaction(() async {
+      for (final connection in connections) {
+        await database.enqueueConnectionAction(
+          id: _uuid.v4(),
+          operation: action,
+          connectionId: connection.connectionId,
+          peerUserId: connection.peerUserId,
+          profileSetId: sharing?.id,
+        );
+        await _applyOptimisticAction(
+          connection.connectionId,
+          action,
+          assignedProfileId: sharing?.id,
+        );
+      }
     });
     await _flushAndPullWhenAvailable(syncProfiles: sharing != null);
   }
@@ -89,6 +140,21 @@ class ConnectionRepository {
         connectionId: connectionId,
       );
       await _removeLocalConnection(connectionId);
+    });
+    await _flushAndPullWhenAvailable();
+  }
+
+  Future<void> deleteMany(List<ConnectedProfileRow> connections) async {
+    if (connections.isEmpty) return;
+    await database.transaction(() async {
+      for (final connection in connections) {
+        await database.enqueueConnectionAction(
+          id: _uuid.v4(),
+          operation: 'delete',
+          connectionId: connection.connectionId,
+        );
+        await _removeLocalConnection(connection.connectionId);
+      }
     });
     await _flushAndPullWhenAvailable();
   }
@@ -160,20 +226,31 @@ class ConnectionRepository {
       final profile = item['profile'] as Map?;
       final keyEnvelope = item['keyEnvelope'] as Map?;
       if (profile != null && keyEnvelope != null) {
-        final key = await crypto.unwrapKey(WrappedKeyEnvelope.fromJson(
-            Map<String, dynamic>.from(keyEnvelope)));
-        final clear = await crypto.decryptJson(
-          EncryptedEnvelope.fromJson(
-              Map<String, dynamic>.from(profile['encryptedBlob'] as Map)),
-          key,
-        );
-        profileJson = jsonEncode(clear);
+        try {
+          final key = await crypto.unwrapKey(WrappedKeyEnvelope.fromJson(
+              Map<String, dynamic>.from(keyEnvelope)));
+          final clear = await crypto.decryptJson(
+            EncryptedEnvelope.fromJson(
+                Map<String, dynamic>.from(profile['encryptedBlob'] as Map)),
+            key,
+          );
+          profileJson = jsonEncode(clear);
+        } catch (error, stackTrace) {
+          debugPrint(
+              'Unable to decrypt profile for connection $connectionId: $error\n$stackTrace');
+          profileJson = jsonEncode({
+            'fields': <String, String>{},
+            'error': 'decryption_failed',
+          });
+        }
       }
       await database.into(database.connectedProfiles).insertOnConflictUpdate(
             ConnectedProfilesCompanion.insert(
               connectionId: connectionId,
               peerUserId: peerUserId,
               peerUsername: Value(item['peerUsername'] as String?),
+              assignedProfileId:
+                  Value(item['assignedProfileClientId'] as String?),
               status: item['status'] as String,
               direction: item['direction'] as String,
               profileJson: Value(profileJson),
@@ -214,21 +291,27 @@ class ConnectionRepository {
   }
 
   Future<void> _applyOptimisticAction(
-      String connectionId, String action) async {
+    String connectionId,
+    String action, {
+    String? assignedProfileId,
+  }) async {
     if (const {'reject', 'cancel', 'delete'}.contains(action)) {
       await _removeLocalConnection(connectionId);
       return;
     }
     final status = switch (action) {
-      'accept' || 'enable' => 'connected',
+      'accept' || 'enable' || 'reconnect' => 'connected',
       'disable' => 'disabled',
       _ => null,
     };
-    if (status != null) {
+    if (status != null || assignedProfileId != null) {
       await (database.update(database.connectedProfiles)
             ..where((row) => row.connectionId.equals(connectionId)))
           .write(ConnectedProfilesCompanion(
-        status: Value(status),
+        status: status == null ? const Value.absent() : Value(status),
+        assignedProfileId: assignedProfileId == null
+            ? const Value.absent()
+            : Value(assignedProfileId),
         updatedAt: Value(DateTime.now()),
       ));
     }

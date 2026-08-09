@@ -26,12 +26,16 @@ describe('ConnectionService profile identifiers', () => {
     } as unknown as ConnectionRepository;
     const service = new ConnectionService(
       repo,
-      {} as ProfileRepository,
+      { findById: vi.fn().mockResolvedValue({ clientId: 'client-profile-id' }) } as unknown as ProfileRepository,
       {} as NotificationService,
     );
 
     await expect(service.list('user-id')).resolves.toMatchObject([
-      { peerUserId: 'peer-id', peerUsername: 'peer.user' },
+      {
+        peerUserId: 'peer-id',
+        peerUsername: 'peer.user',
+        assignedProfileClientId: 'client-profile-id',
+      },
     ]);
   });
 
@@ -51,5 +55,40 @@ describe('ConnectionService profile identifiers', () => {
 
     expect(repo.findOwnedProfileByClientId).toHaveBeenCalledWith('client-profile-id', 'user-id');
     expect(create).toHaveBeenCalledWith('user-id', 'peer-id', 'server-profile-id', envelope);
+  });
+
+  it('refreshes an existing connection without another acceptance', async () => {
+    const existing = {
+      id: 'connection-id',
+      requesterId: 'user-id',
+      addresseeId: 'peer-id',
+      status: 'disabled',
+    };
+    const update = vi.fn().mockResolvedValue({ ...existing, status: 'connected' });
+    const create = vi.fn();
+    const repo = {
+      findUserKey: vi.fn().mockResolvedValue({ id: 'peer-id' }),
+      findOwnedProfileByClientId: vi.fn().mockResolvedValue({ id: 'server-profile-id' }),
+      findPair: vi.fn().mockResolvedValue(existing),
+      update,
+      create,
+    } as unknown as ConnectionRepository;
+    const notifications = { send: vi.fn() } as unknown as NotificationService;
+    const service = new ConnectionService(repo, {} as ProfileRepository, notifications);
+    const envelope = { ephemeralPublicKey: 'key', nonce: 'nonce', ciphertext: 'ciphertext' };
+
+    await service.request('user-id', 'peer-id', 'client-profile-id', envelope);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith('connection-id', {
+      status: 'connected',
+      requesterProfileSetId: 'server-profile-id',
+      requesterKeyEnvelope: envelope,
+    });
+    expect(notifications.send).toHaveBeenCalledWith(
+      ['peer-id'],
+      'connection_refreshed',
+      { connectionId: 'connection-id', userId: 'user-id' },
+    );
   });
 });

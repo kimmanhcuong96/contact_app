@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../core/database/app_database.dart' as db;
 import '../core/network/api_client.dart';
@@ -70,7 +71,17 @@ class ProfileRepository {
         version: profile.version);
   }
 
-  Future<void> deleteSharing(String id) => database.removeSharingProfile(id);
+  Future<void> deleteSharing(String id) async {
+    final assigned = await (database.select(database.connectedProfiles)
+          ..where((row) =>
+              row.assignedProfileId.equals(id) &
+              row.status.isIn(const ['connected', 'disabled'])))
+        .get();
+    if (assigned.isNotEmpty) {
+      throw SharingProfileInUseException(assigned.length);
+    }
+    await database.removeSharingProfile(id);
+  }
 
   Future<void> sync() async {
     final master = await database.watchMasterProfile().first;
@@ -137,4 +148,10 @@ class ProfileRepository {
               key: entry.key, value: '${entry.value}'));
     }
   }
+}
+
+class SharingProfileInUseException implements Exception {
+  const SharingProfileInUseException(this.connectionCount);
+
+  final int connectionCount;
 }

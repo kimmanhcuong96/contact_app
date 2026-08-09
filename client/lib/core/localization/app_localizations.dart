@@ -134,6 +134,18 @@ const _translations = <String, Map<String, String>>{
     'contactDetails': 'Contact details',
     'sharedInformation': 'Shared information',
     'noSharedInformation': 'This person has not shared any profile fields.',
+    'sharedInformationUnavailable':
+        'This shared profile could not be decrypted. Ask this contact to share their profile with you again.',
+    'unassignedProfile': 'Unassigned',
+    'selectedCount': '{count} selected',
+    'selectAll': 'Select all',
+    'selectMultiple': 'Select multiple',
+    'changeProfile': 'Change profile',
+    'selectConnectedOnly':
+        'Profile changes are available only for active connections.',
+    'deleteSelectedContacts': 'Delete selected contacts?',
+    'deleteSelectedContactsConfirm':
+        'Delete {count} selected contacts and their connections?',
     'connectionRequest': 'Connection request · {id}',
     'incomingRequests': 'Incoming requests',
     'sentRequests': 'Sent requests',
@@ -174,6 +186,8 @@ const _translations = <String, Map<String, String>>{
     'qrSaved': 'QR image saved.',
     'qrNotFound': 'No NexBook QR was found in this image.',
     'connectionQueued': 'Connection request saved and ready to sync.',
+    'connectionRefreshed':
+        'Connection refreshed with the latest shared information.',
     'shareQrLink': 'Share QR link',
     'shareQrSubject': 'Connect with me on NexBook',
     'cannotLoadQr': 'Cannot load your QR code.',
@@ -266,6 +280,9 @@ const _translations = <String, Map<String, String>>{
     'error.server':
         'NexBook is temporarily unavailable. Please try again later.',
     'error.generic': 'Something went wrong. Please try again.',
+    'error.cannotOpenLink': 'No compatible app could open this information.',
+    'error.profileInUse':
+        'This sharing profile is used by {count} contacts. Move them to another profile before deleting it.',
   },
   'vi': {
     'tagline': 'Danh bạ của bạn. Chìa khóa của bạn.',
@@ -303,6 +320,18 @@ const _translations = <String, Map<String, String>>{
     'contactDetails': 'Chi tiết liên hệ',
     'sharedInformation': 'Thông tin được chia sẻ',
     'noSharedInformation': 'Người này chưa chia sẻ trường thông tin nào.',
+    'sharedInformationUnavailable':
+        'Không thể giải mã hồ sơ được chia sẻ. Hãy nhờ liên hệ này chia sẻ lại hồ sơ với bạn.',
+    'unassignedProfile': 'Chưa phân loại',
+    'selectedCount': 'Đã chọn {count}',
+    'selectAll': 'Chọn tất cả',
+    'selectMultiple': 'Chọn nhiều',
+    'changeProfile': 'Đổi hồ sơ',
+    'selectConnectedOnly':
+        'Chỉ có thể đổi hồ sơ cho các kết nối đang hoạt động.',
+    'deleteSelectedContacts': 'Xóa các liên hệ đã chọn?',
+    'deleteSelectedContactsConfirm':
+        'Xóa {count} liên hệ đã chọn và các kết nối tương ứng?',
     'connectionRequest': 'Yêu cầu kết nối · {id}',
     'incomingRequests': 'Yêu cầu đến',
     'sentRequests': 'Đã gửi',
@@ -343,6 +372,7 @@ const _translations = <String, Map<String, String>>{
     'qrSaved': 'Đã lưu ảnh QR.',
     'qrNotFound': 'Không tìm thấy mã QR NexBook trong ảnh này.',
     'connectionQueued': 'Đã lưu yêu cầu kết nối và sẵn sàng đồng bộ.',
+    'connectionRefreshed': 'Đã làm mới kết nối với thông tin chia sẻ mới nhất.',
     'shareQrLink': 'Chia sẻ mã QR',
     'shareQrSubject': 'Kết nối với tôi trên NexBook',
     'cannotLoadQr': 'Không thể tải mã QR của bạn.',
@@ -436,6 +466,9 @@ const _translations = <String, Map<String, String>>{
     'error.timeout': 'Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.',
     'error.server': 'NexBook đang tạm thời gián đoạn. Vui lòng thử lại sau.',
     'error.generic': 'Đã xảy ra lỗi. Vui lòng thử lại.',
+    'error.cannotOpenLink': 'Không có ứng dụng phù hợp để mở thông tin này.',
+    'error.profileInUse':
+        'Hồ sơ chia sẻ này đang được {count} liên hệ sử dụng. Hãy chuyển họ sang hồ sơ khác trước khi xóa.',
   },
   'zh': {
     'tagline': '您的联系人，您的密钥。',
@@ -473,6 +506,15 @@ const _translations = <String, Map<String, String>>{
     'contactDetails': '联系人详情',
     'sharedInformation': '共享信息',
     'noSharedInformation': '此联系人尚未共享任何资料字段。',
+    'sharedInformationUnavailable': '无法解密此共享资料。请让该联系人重新向您共享资料。',
+    'unassignedProfile': '未分类',
+    'selectedCount': '已选择 {count} 项',
+    'selectAll': '全选',
+    'selectMultiple': '多选',
+    'changeProfile': '更改资料',
+    'selectConnectedOnly': '只能更改有效连接的共享资料。',
+    'deleteSelectedContacts': '删除所选联系人？',
+    'deleteSelectedContactsConfirm': '删除所选的 {count} 个联系人及其连接？',
     'connectionRequest': '连接请求 · {id}',
     'incomingRequests': '收到的请求',
     'sentRequests': '已发送',
@@ -512,6 +554,7 @@ const _translations = <String, Map<String, String>>{
     'qrSaved': '二维码图片已保存。',
     'qrNotFound': '此图片中未找到 NexBook 二维码。',
     'connectionQueued': '连接请求已保存，等待同步。',
+    'connectionRefreshed': '连接已使用最新共享信息刷新。',
     'shareQrLink': '共享二维码',
     'shareQrSubject': '在 NexBook 上与我连接',
     'cannotLoadQr': '无法加载您的二维码。',
@@ -595,6 +638,8 @@ const _translations = <String, Map<String, String>>{
     'error.timeout': '请求超时，请重试。',
     'error.server': 'NexBook 暂时不可用，请稍后重试。',
     'error.generic': '发生错误，请重试。',
+    'error.cannotOpenLink': '没有兼容的应用可以打开此信息。',
+    'error.profileInUse': '此共享资料正被 {count} 个联系人使用。请先将他们移至其他资料。',
   },
   'ja': {
     'tagline': 'あなたの連絡先。あなたの鍵。',
@@ -632,6 +677,16 @@ const _translations = <String, Map<String, String>>{
     'contactDetails': '連絡先の詳細',
     'sharedInformation': '共有された情報',
     'noSharedInformation': 'この連絡先はプロフィール項目を共有していません。',
+    'sharedInformationUnavailable':
+        '共有プロフィールを復号できませんでした。この連絡先にプロフィールを再共有してもらってください。',
+    'unassignedProfile': '未分類',
+    'selectedCount': '{count}件選択',
+    'selectAll': 'すべて選択',
+    'selectMultiple': '複数選択',
+    'changeProfile': 'プロフィール変更',
+    'selectConnectedOnly': '共有プロフィールを変更できるのは有効な接続のみです。',
+    'deleteSelectedContacts': '選択した連絡先を削除しますか？',
+    'deleteSelectedContactsConfirm': '選択した{count}件の連絡先と接続を削除しますか？',
     'connectionRequest': '接続リクエスト · {id}',
     'incomingRequests': '受信したリクエスト',
     'sentRequests': '送信済み',
@@ -671,6 +726,7 @@ const _translations = <String, Map<String, String>>{
     'qrSaved': 'QR画像を保存しました。',
     'qrNotFound': 'この画像にNexBook QRが見つかりません。',
     'connectionQueued': '接続リクエストを保存し、同期待ちにしました。',
+    'connectionRefreshed': '最新の共有情報で接続を更新しました。',
     'shareQrLink': 'QRコードを共有',
     'shareQrSubject': 'NexBookでつながる',
     'cannotLoadQr': 'QRコードを読み込めません。',
@@ -754,5 +810,8 @@ const _translations = <String, Map<String, String>>{
     'error.timeout': 'リクエストがタイムアウトしました。再試行してください。',
     'error.server': 'NexBookは一時的に利用できません。後でもう一度お試しください。',
     'error.generic': 'エラーが発生しました。もう一度お試しください。',
+    'error.cannotOpenLink': 'この情報を開ける対応アプリがありません。',
+    'error.profileInUse':
+        'この共有プロフィールは{count}件の連絡先で使用中です。削除前に別のプロフィールへ移動してください。',
   },
 };
