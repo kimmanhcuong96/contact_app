@@ -14,6 +14,26 @@ void main() {
     );
   });
 
+  test('master profile reads legacy and loosely typed local data', () {
+    final profile = MasterProfile.decode('''
+      {
+        "fields": {"fullName": "An", "phone": 123, "notes": null},
+        "avatarBase64": "legacy-avatar"
+      }
+    ''');
+
+    expect(profile.fields, {'fullName': 'An', 'phone': '123'});
+    expect(profile.avatarBase64, 'legacy-avatar');
+    expect(MasterProfile.decode('{}'), MasterProfile.empty);
+  });
+
+  test('master profile rejects structurally corrupted local data', () {
+    expect(
+      () => MasterProfile.decode('{"fields": []}'),
+      throwsFormatException,
+    );
+  });
+
   test('sharing profile round-trips visibility policy', () {
     const profile = SharingProfile(
         id: 'id',

@@ -303,7 +303,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
 
   Future<void> _sync() async {
     try {
-      await ref.read(connectionRepositoryProvider).sync();
+      await ref.read(syncServiceProvider).syncNow();
     } catch (error) {
       if (mounted) _showError(error);
     }

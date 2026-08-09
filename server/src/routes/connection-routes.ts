@@ -15,5 +15,5 @@ const service = (c: { var: { db: AppBindings['Variables']['db'] }; env: AppBindi
 export const connectionRoutes = new Hono<AppBindings>()
   .get('/', async (c) => c.json({ items: await service(c).list(c.var.userId) }))
   .post('/', async (c) => { const body = await jsonBody(c, z.object({ peerUserId: uuid, profileSetId: uuid, keyEnvelope })); return c.json(await service(c).request(c.var.userId, body.peerUserId, body.profileSetId, body.keyEnvelope), 201); })
-  .put('/:id', async (c) => { const body = await jsonBody(c, z.object({ action: z.enum(['accept', 'reject', 'cancel', 'disable', 'enable', 'assign', 'reconnect']), profileSetId: uuid.optional(), keyEnvelope: keyEnvelope.optional() })); return c.json(await service(c).update(c.var.userId, uuid.parse(c.req.param('id')), body.action, body.profileSetId, body.keyEnvelope)); })
+  .put('/:id', async (c) => { const body = await jsonBody(c, z.object({ action: z.enum(['accept', 'reject', 'cancel', 'disable', 'enable', 'assign', 'reconnect', 'request_key_refresh']), profileSetId: uuid.optional(), keyEnvelope: keyEnvelope.optional() })); return c.json(await service(c).update(c.var.userId, uuid.parse(c.req.param('id')), body.action, body.profileSetId, body.keyEnvelope)); })
   .delete('/:id', async (c) => { await service(c).remove(c.var.userId, uuid.parse(c.req.param('id'))); return c.body(null, 204); });

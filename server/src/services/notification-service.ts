@@ -2,7 +2,7 @@ import { importPKCS8, SignJWT } from 'jose';
 import type { Env } from '../types';
 import { NotificationRepository } from '../repositories/notification-repository';
 
-export type NotificationEvent = 'connection_request' | 'connection_accepted' | 'connection_refreshed' | 'profile_updated' | 'sharing_profile_changed';
+export type NotificationEvent = 'connection_request' | 'connection_accepted' | 'connection_refreshed' | 'profile_updated' | 'sharing_profile_changed' | 'identity_key_changed' | 'key_refresh_requested';
 
 let cachedAccessToken: { value: string; expiresAt: number } | undefined;
 

@@ -9,7 +9,7 @@ export class ConnectionService {
   async list(userId: string) {
     const rows = await this.repo.list(userId);
     const peerIds = rows.map((row) => row.requesterId === userId ? row.addresseeId : row.requesterId);
-    const usernames = new Map((await this.repo.findUsernames(peerIds)).map((user) => [user.id, user.username]));
+    const peers = new Map((await this.repo.findUsernames(peerIds)).map((user) => [user.id, user]));
     return Promise.all(rows.map(async (row) => {
       const outgoing = row.requesterId === userId;
       const peerUserId = outgoing ? row.addresseeId : row.requesterId;
@@ -20,7 +20,8 @@ export class ConnectionService {
       return {
         id: row.id,
         peerUserId,
-        peerUsername: usernames.get(peerUserId) ?? null,
+        peerUsername: peers.get(peerUserId)?.username ?? null,
+        peerPublicKey: peers.get(peerUserId)?.publicKey ?? null,
         direction: outgoing ? 'outgoing' : 'incoming',
         status: row.status,
         assignedProfileClientId: assignedSet?.clientId ?? null,
@@ -85,6 +86,12 @@ export class ConnectionService {
       const peer = row.requesterId === userId ? row.addresseeId : row.requesterId;
       await this.notifications.send([peer], 'connection_refreshed', { connectionId: id, userId });
       return updated;
+    }
+    if (action === 'request_key_refresh') {
+      if (row.status !== 'connected') throw new HttpError(400, 'Key refresh requires an active connection', 'invalid_state');
+      const peer = row.requesterId === userId ? row.addresseeId : row.requesterId;
+      await this.notifications.send([peer], 'key_refresh_requested', { connectionId: id, userId });
+      return row;
     }
     throw new HttpError(400, 'Unsupported connection action', 'invalid_action');
   }

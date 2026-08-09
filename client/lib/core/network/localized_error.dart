@@ -1,10 +1,29 @@
 import 'package:dio/dio.dart';
 import '../localization/app_localizations.dart';
 import '../../repositories/profile_repository.dart';
+import '../../repositories/connection_repository.dart';
+import '../sync/sync_service.dart';
 
 String localizedError(AppLocalizations l10n, Object? error) {
   if (error is SharingProfileInUseException) {
     return l10n.t('error.profileInUse', {'count': error.connectionCount});
+  }
+  if (error is PendingConnectionActionException) {
+    return l10n.t('error.pendingActionDiscarded');
+  }
+  if (error is ProfileSyncException) {
+    return l10n.t('error.profileSyncFailed', {
+      'name': error.profileName,
+      'details': localizedError(l10n, error.cause),
+    });
+  }
+  if (error is SyncOperationException) {
+    return l10n.t(
+      error.operation == SyncOperation.profiles
+          ? 'error.profilesSyncFailed'
+          : 'error.connectionsSyncFailed',
+      {'details': localizedError(l10n, error.cause)},
+    );
   }
   if (error is DioException) {
     if (error.type == DioExceptionType.connectionTimeout ||
@@ -12,7 +31,8 @@ String localizedError(AppLocalizations l10n, Object? error) {
         error.type == DioExceptionType.receiveTimeout) {
       return l10n.t('error.timeout');
     }
-    if (error.type == DioExceptionType.connectionError) {
+    if (error.type == DioExceptionType.connectionError ||
+        (error.type == DioExceptionType.unknown && error.response == null)) {
       return l10n.t('error.network');
     }
 
@@ -54,10 +74,18 @@ String localizedError(AppLocalizations l10n, Object? error) {
       'forbidden' => 'error.forbidden',
       'version_conflict' => 'error.versionConflict',
       'rate_limited' => 'error.rateLimited',
+      'not_found' => 'error.notFound',
       _ => null,
     };
     if (key != null) return l10n.t(key);
+    if (response?.statusCode == 404) return l10n.t('error.notFound');
+    if (response?.statusCode == 400 || response?.statusCode == 422) {
+      return l10n.t('error.invalidData');
+    }
     if ((response?.statusCode ?? 0) >= 500) return l10n.t('error.server');
+  }
+  if (error is FormatException || error is TypeError || error is StateError) {
+    return l10n.t('error.localData');
   }
   return l10n.t('error.generic');
 }

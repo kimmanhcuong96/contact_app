@@ -161,45 +161,86 @@ class ConnectionRepository {
 
   Future<void> flushPendingActions() async {
     final queue = await database.pendingConnectionQueue();
+    PendingConnectionActionException? discarded;
     for (final pending in queue) {
       try {
         await _send(pending);
         await database.removePendingConnectionAction(pending.id);
+      } on PendingConnectionActionException catch (error) {
+        await database.removePendingConnectionAction(pending.id);
+        if (pending.operation == 'request') {
+          await _removeLocalConnection('local:${pending.id}');
+        }
+        discarded ??= error;
       } on DioException catch (error) {
-        if (error.response != null) {
+        final status = error.response?.statusCode;
+        if (status != null &&
+            status >= 400 &&
+            status < 500 &&
+            status != 408 &&
+            status != 429) {
           await database.removePendingConnectionAction(pending.id);
           if (pending.operation == 'request') {
             await _removeLocalConnection('local:${pending.id}');
           }
         }
         rethrow;
+      } catch (error) {
+        if (!_isInvalidLocalAction(error)) rethrow;
+        await database.removePendingConnectionAction(pending.id);
+        if (pending.operation == 'request') {
+          await _removeLocalConnection('local:${pending.id}');
+        }
+        discarded ??= PendingConnectionActionException(pending.operation);
       }
     }
+    if (discarded != null) throw discarded;
   }
 
   Future<void> _send(PendingConnectionActionRow pending) async {
+    final connectionId = pending.connectionId;
+    final profileSetId = pending.profileSetId;
+    final needsProfile = const {
+      'request',
+      'accept',
+      'assign',
+      'reconnect',
+    }.contains(pending.operation);
+    if (pending.operation != 'request' && connectionId == null) {
+      throw PendingConnectionActionException(pending.operation);
+    }
+    if (needsProfile && profileSetId == null) {
+      throw PendingConnectionActionException(pending.operation);
+    }
+
     if (pending.operation == 'request') {
-      final sharing = await _sharingProfile(pending.profileSetId!);
-      final envelope = await _keyEnvelope(sharing, pending.peerUserId!);
+      final peerUserId = pending.peerUserId;
+      if (peerUserId == null) {
+        throw PendingConnectionActionException(pending.operation);
+      }
+      final sharing = await _sharingProfile(profileSetId!, pending.operation);
+      final envelope = await _keyEnvelope(sharing, peerUserId);
       await api.dio.post<void>('/connections', data: {
-        'peerUserId': pending.peerUserId,
+        'peerUserId': peerUserId,
         'profileSetId': sharing.id,
         'keyEnvelope': envelope,
       });
       return;
     }
     if (pending.operation == 'delete') {
-      await api.dio.delete<void>('/connections/${pending.connectionId}');
+      await api.dio.delete<void>('/connections/$connectionId');
       return;
     }
-    final sharing = pending.profileSetId == null
+    final sharing = profileSetId == null
         ? null
-        : await _sharingProfile(pending.profileSetId!);
-    final envelope = sharing == null
+        : await _sharingProfile(profileSetId, pending.operation);
+    final peerUserId = sharing == null
         ? null
-        : await _keyEnvelope(sharing, pending.peerUserId!);
+        : await _resolvePeerUserId(pending, connectionId!);
+    final envelope =
+        sharing == null ? null : await _keyEnvelope(sharing, peerUserId!);
     await api.dio.put<void>(
-      '/connections/${pending.connectionId}',
+      '/connections/$connectionId',
       data: {
         'action': pending.operation,
         if (sharing != null) 'profileSetId': sharing.id,
@@ -209,18 +250,27 @@ class ConnectionRepository {
   }
 
   Future<void> sync() async {
-    await flushPendingActions();
+    PendingConnectionActionException? discarded;
+    try {
+      await flushPendingActions();
+    } on PendingConnectionActionException catch (error) {
+      discarded = error;
+    }
     await _pull();
+    if (discarded != null) throw discarded;
   }
 
   Future<void> _pull() async {
     final response = await api.dio.get<Map<String, dynamic>>('/connections');
     final items = response.data!['items'] as List;
     final seen = <String>{};
+    var queuedKeyRefresh = false;
+    final failedDecryptions = <(String, int)>[];
     for (final raw in items) {
       final item = Map<String, dynamic>.from(raw as Map);
       final connectionId = item['id'] as String;
       final peerUserId = item['peerUserId'] as String;
+      final peerPublicKey = item['peerPublicKey'] as String?;
       seen.add(connectionId);
       String? profileJson;
       final profile = item['profile'] as Map?;
@@ -235,6 +285,7 @@ class ConnectionRepository {
             key,
           );
           profileJson = jsonEncode(clear);
+          await database.clearKeyRefreshRequest(connectionId);
         } catch (error, stackTrace) {
           debugPrint(
               'Unable to decrypt profile for connection $connectionId: $error\n$stackTrace');
@@ -242,15 +293,30 @@ class ConnectionRepository {
             'fields': <String, String>{},
             'error': 'decryption_failed',
           });
+          failedDecryptions.add((
+            connectionId,
+            (profile['version'] as num?)?.toInt() ?? 0,
+          ));
         }
+      }
+      final assignedProfileId = item['assignedProfileClientId'] as String?;
+      if (item['status'] == 'connected' &&
+          assignedProfileId != null &&
+          peerPublicKey != null) {
+        queuedKeyRefresh = await database.queuePeerKeyRefresh(
+              connectionId: connectionId,
+              peerUserId: peerUserId,
+              profileSetId: assignedProfileId,
+              publicKey: peerPublicKey,
+            ) ||
+            queuedKeyRefresh;
       }
       await database.into(database.connectedProfiles).insertOnConflictUpdate(
             ConnectedProfilesCompanion.insert(
               connectionId: connectionId,
               peerUserId: peerUserId,
               peerUsername: Value(item['peerUsername'] as String?),
-              assignedProfileId:
-                  Value(item['assignedProfileClientId'] as String?),
+              assignedProfileId: Value(assignedProfileId),
               status: item['status'] as String,
               direction: item['direction'] as String,
               profileJson: Value(profileJson),
@@ -272,12 +338,48 @@ class ConnectionRepository {
         !seen.contains(row.connectionId))) {
       await _removeLocalConnection(row.connectionId);
     }
+    if (queuedKeyRefresh) await flushPendingActions();
+    for (final failure in failedDecryptions) {
+      if (!await database.shouldRequestKeyRefresh(failure.$1, failure.$2)) {
+        continue;
+      }
+      try {
+        await api.dio.put<void>(
+          '/connections/${failure.$1}',
+          data: {'action': 'request_key_refresh'},
+        );
+        await database.markKeyRefreshRequested(failure.$1, failure.$2);
+      } catch (error, stackTrace) {
+        debugPrint(
+            'Unable to request key refresh for ${failure.$1}: $error\n$stackTrace');
+      }
+    }
   }
 
-  Future<SharingProfileRow> _sharingProfile(String id) =>
-      (database.select(database.sharingProfiles)
-            ..where((row) => row.id.equals(id)))
-          .getSingle();
+  Future<SharingProfileRow> _sharingProfile(
+    String id,
+    String operation,
+  ) async {
+    final sharing = await (database.select(database.sharingProfiles)
+          ..where((row) => row.id.equals(id)))
+        .getSingleOrNull();
+    if (sharing == null) throw PendingConnectionActionException(operation);
+    return sharing;
+  }
+
+  Future<String> _resolvePeerUserId(
+    PendingConnectionActionRow pending,
+    String connectionId,
+  ) async {
+    if (pending.peerUserId != null) return pending.peerUserId!;
+    final connection = await (database.select(database.connectedProfiles)
+          ..where((row) => row.connectionId.equals(connectionId)))
+        .getSingleOrNull();
+    if (connection == null) {
+      throw PendingConnectionActionException(pending.operation);
+    }
+    return connection.peerUserId;
+  }
 
   Future<Map<String, dynamic>> _keyEnvelope(
       SharingProfileRow sharing, String peerUserId) async {
@@ -347,4 +449,16 @@ class ConnectionRepository {
         DioExceptionType.connectionError,
         DioExceptionType.unknown,
       }.contains(error.type);
+
+  bool _isInvalidLocalAction(Object error) =>
+      error is FormatException ||
+      error is StateError ||
+      error is TypeError ||
+      error is ArgumentError;
+}
+
+class PendingConnectionActionException implements Exception {
+  const PendingConnectionActionException(this.operation);
+
+  final String operation;
 }

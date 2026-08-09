@@ -11,6 +11,7 @@ class SyncService {
   final AppDatabase database;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   final _statuses = StreamController<SyncStatus>.broadcast();
+  Future<void>? _activeSync;
 
   Stream<SyncStatus> get statuses => _statuses.stream;
 
@@ -22,11 +23,36 @@ class SyncService {
     });
   }
 
-  Future<void> syncNow() async {
+  Future<void> syncNow() {
+    final active = _activeSync;
+    if (active != null) return active;
+    final future = _runSync();
+    _activeSync = future;
+    return future.whenComplete(() {
+      if (identical(_activeSync, future)) _activeSync = null;
+    });
+  }
+
+  Future<void> _runSync() async {
     _statuses.add(const SyncStatus.syncing());
     try {
-      await profiles.sync();
-      await connections.sync();
+      try {
+        await profiles.sync();
+      } catch (error, stackTrace) {
+        if (error is ProfileSyncException) rethrow;
+        Error.throwWithStackTrace(
+          SyncOperationException(SyncOperation.profiles, error),
+          stackTrace,
+        );
+      }
+      try {
+        await connections.sync();
+      } catch (error, stackTrace) {
+        Error.throwWithStackTrace(
+          SyncOperationException(SyncOperation.connections, error),
+          stackTrace,
+        );
+      }
       _statuses.add(const SyncStatus.success());
     } catch (error, stackTrace) {
       _statuses.add(SyncStatus.failure(error));
@@ -49,6 +75,15 @@ class SyncService {
     await _subscription?.cancel();
     await _statuses.close();
   }
+}
+
+enum SyncOperation { profiles, connections }
+
+class SyncOperationException implements Exception {
+  const SyncOperationException(this.operation, this.cause);
+
+  final SyncOperation operation;
+  final Object cause;
 }
 
 class SyncStatus {

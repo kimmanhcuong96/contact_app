@@ -46,8 +46,16 @@ final syncServiceProvider = Provider((ref) {
 final syncStatusProvider =
     StreamProvider((ref) => ref.watch(syncServiceProvider).statuses);
 final notificationRegistrationProvider = Provider((ref) {
-  final value = NotificationRegistrationService(ref.watch(apiClientProvider))
-    ..start();
+  final value = NotificationRegistrationService(
+    ref.watch(apiClientProvider),
+    onDataChanged: () async {
+      try {
+        await ref.read(syncServiceProvider).syncNow();
+      } catch (_) {
+        // SyncService reports the actionable error and retries later.
+      }
+    },
+  )..start();
   ref.onDispose(value.dispose);
   return value;
 });
@@ -58,6 +66,9 @@ final sharingProfilesProvider = StreamProvider<List<SharingProfile>>(
     (ref) => ref.watch(profileRepositoryProvider).watchSharing());
 final connectionsProvider = StreamProvider(
     (ref) => ref.watch(connectionRepositoryProvider).watchConnections());
+final connectedProfileProvider =
+    StreamProvider.family<ConnectedProfileRow?, String>((ref, connectionId) =>
+        ref.watch(databaseProvider).watchConnectedProfile(connectionId));
 final themeModeProvider = FutureProvider<ThemeMode>((ref) async {
   final database = ref.watch(databaseProvider);
   final row = await (database.select(database.appSettings)

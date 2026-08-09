@@ -15,7 +15,7 @@ export class ConnectionRepository {
   findUserKey(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id), columns: { id: true, publicKey: true } }); }
   findUsernames(ids: string[]) {
     if (ids.length === 0) return Promise.resolve([]);
-    return this.db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, ids));
+    return this.db.select({ id: users.id, username: users.username, publicKey: users.publicKey }).from(users).where(inArray(users.id, ids));
   }
   findOwnedProfileByClientId(clientId: string, ownerId: string) {
     return this.db.query.profileSets.findFirst({

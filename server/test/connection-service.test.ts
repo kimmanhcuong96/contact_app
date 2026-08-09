@@ -22,7 +22,7 @@ describe('ConnectionService profile identifiers', () => {
       ]),
       findUsernames: vi
           .fn()
-          .mockResolvedValue([{ id: 'peer-id', username: 'peer.user' }]),
+          .mockResolvedValue([{ id: 'peer-id', username: 'peer.user', publicKey: 'peer-key' }]),
     } as unknown as ConnectionRepository;
     const service = new ConnectionService(
       repo,
@@ -34,9 +34,32 @@ describe('ConnectionService profile identifiers', () => {
       {
         peerUserId: 'peer-id',
         peerUsername: 'peer.user',
+        peerPublicKey: 'peer-key',
         assignedProfileClientId: 'client-profile-id',
       },
     ]);
+  });
+
+  it('notifies a peer when an encrypted profile key must be refreshed', async () => {
+    const connection = {
+      id: 'connection-id',
+      requesterId: 'user-id',
+      addresseeId: 'peer-id',
+      status: 'connected',
+    };
+    const repo = {
+      find: vi.fn().mockResolvedValue(connection),
+    } as unknown as ConnectionRepository;
+    const notifications = { send: vi.fn() } as unknown as NotificationService;
+    const service = new ConnectionService(repo, {} as ProfileRepository, notifications);
+
+    await service.update('user-id', 'connection-id', 'request_key_refresh');
+
+    expect(notifications.send).toHaveBeenCalledWith(
+      ['peer-id'],
+      'key_refresh_requested',
+      { connectionId: 'connection-id', userId: 'user-id' },
+    );
   });
 
   it('resolves the client profile id before creating a connection', async () => {

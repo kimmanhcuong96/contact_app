@@ -99,6 +99,18 @@ class _AppLocalizationsDelegate
 
 const _translations = <String, Map<String, String>>{
   'en': {
+    'error.pendingActionDiscarded':
+        'An outdated connection change could not be completed and was removed. Your connections were refreshed from NexBook.',
+    'error.notFound':
+        'The requested data no longer exists. Sync and try again.',
+    'error.invalidData':
+        'NexBook could not process this data. Review it and try again.',
+    'error.profileSyncFailed':
+        'Could not sync sharing profile "{name}": {details}',
+    'error.profilesSyncFailed': 'Could not sync your profiles: {details}',
+    'error.connectionsSyncFailed': 'Could not sync connections: {details}',
+    'error.localData':
+        'Some saved data could not be read. Reload the app or sign in again.',
     'tagline': 'Your contacts. Your keys.',
     'username': 'Username',
     'usernameHint': '3–32 characters: letters, numbers, . or _',
@@ -285,6 +297,18 @@ const _translations = <String, Map<String, String>>{
         'This sharing profile is used by {count} contacts. Move them to another profile before deleting it.',
   },
   'vi': {
+    'error.pendingActionDiscarded':
+        'Một thay đổi kết nối cũ không thể hoàn tất và đã được hủy. Danh sách kết nối đã được tải lại từ NexBook.',
+    'error.notFound':
+        'Dữ liệu được yêu cầu không còn tồn tại. Hãy đồng bộ rồi thử lại.',
+    'error.invalidData':
+        'NexBook không thể xử lý dữ liệu này. Hãy kiểm tra rồi thử lại.',
+    'error.profileSyncFailed':
+        'Không thể đồng bộ hồ sơ chia sẻ "{name}": {details}',
+    'error.profilesSyncFailed': 'Không thể đồng bộ hồ sơ của bạn: {details}',
+    'error.connectionsSyncFailed': 'Không thể đồng bộ kết nối: {details}',
+    'error.localData':
+        'Không thể đọc một số dữ liệu đã lưu. Hãy tải lại ứng dụng hoặc đăng nhập lại.',
     'tagline': 'Danh bạ của bạn. Chìa khóa của bạn.',
     'username': 'Tên đăng nhập',
     'usernameHint': '3–32 ký tự: chữ, số, dấu chấm hoặc gạch dưới',
@@ -471,6 +495,13 @@ const _translations = <String, Map<String, String>>{
         'Hồ sơ chia sẻ này đang được {count} liên hệ sử dụng. Hãy chuyển họ sang hồ sơ khác trước khi xóa.',
   },
   'zh': {
+    'error.pendingActionDiscarded': '一个旧的连接更改无法完成，已被移除。连接列表已从 NexBook 重新加载。',
+    'error.notFound': '请求的数据已不存在。请同步后重试。',
+    'error.invalidData': 'NexBook 无法处理此数据。请检查后重试。',
+    'error.profileSyncFailed': '无法同步共享资料“{name}”：{details}',
+    'error.profilesSyncFailed': '无法同步您的资料：{details}',
+    'error.connectionsSyncFailed': '无法同步连接：{details}',
+    'error.localData': '无法读取部分已保存的数据。请重新加载应用或重新登录。',
     'tagline': '您的联系人，您的密钥。',
     'username': '用户名',
     'usernameHint': '3–32 个字符：字母、数字、句点或下划线',
@@ -642,6 +673,14 @@ const _translations = <String, Map<String, String>>{
     'error.profileInUse': '此共享资料正被 {count} 个联系人使用。请先将他们移至其他资料。',
   },
   'ja': {
+    'error.pendingActionDiscarded':
+        '古い接続変更を完了できなかったため削除しました。接続一覧はNexBookから再読み込みされました。',
+    'error.notFound': '要求されたデータは存在しません。同期してから再試行してください。',
+    'error.invalidData': 'NexBookはこのデータを処理できません。内容を確認して再試行してください。',
+    'error.profileSyncFailed': '共有プロフィール「{name}」を同期できませんでした: {details}',
+    'error.profilesSyncFailed': 'プロフィールを同期できませんでした: {details}',
+    'error.connectionsSyncFailed': '接続を同期できませんでした: {details}',
+    'error.localData': '保存済みデータの一部を読み込めませんでした。アプリを再読み込みするか、再度ログインしてください。',
     'tagline': 'あなたの連絡先。あなたの鍵。',
     'username': 'ユーザー名',
     'usernameHint': '3～32文字：英数字、ピリオド、アンダースコア',

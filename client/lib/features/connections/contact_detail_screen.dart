@@ -1,25 +1,29 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_localizations.dart';
+import '../../core/providers.dart';
 
-class ContactDetailScreen extends StatelessWidget {
+class ContactDetailScreen extends ConsumerWidget {
   const ContactDetailScreen({super.key, required this.contact});
 
   final ConnectedProfileRow contact;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final fields = _fields;
-    final profileError = _profileError;
+    final current = ref.watch(connectedProfileProvider(contact.connectionId));
+    final liveContact = current.valueOrNull ?? contact;
+    final fields = _fields(liveContact);
+    final profileError = _profileError(liveContact);
     final name = fields['fullName'] ??
-        (contact.peerUsername == null
+        (liveContact.peerUsername == null
             ? l10n.t('privateContact')
-            : '@${contact.peerUsername}');
+            : '@${liveContact.peerUsername}');
     return Scaffold(
       appBar: AppBar(title: Text(l10n.t('contactDetails'))),
       body: ListView(
@@ -40,11 +44,11 @@ class ContactDetailScreen extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          if (contact.peerUsername != null &&
-              name != '@${contact.peerUsername}') ...[
+          if (liveContact.peerUsername != null &&
+              name != '@${liveContact.peerUsername}') ...[
             const SizedBox(height: 4),
             Text(
-              '@${contact.peerUsername}',
+              '@${liveContact.peerUsername}',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -98,7 +102,7 @@ class ContactDetailScreen extends StatelessWidget {
     );
   }
 
-  Map<String, String> get _fields {
+  Map<String, String> _fields(ConnectedProfileRow contact) {
     if (contact.profileJson == null) return const {};
     try {
       final decoded = jsonDecode(contact.profileJson!) as Map<String, dynamic>;
@@ -113,7 +117,7 @@ class ContactDetailScreen extends StatelessWidget {
     }
   }
 
-  String? get _profileError {
+  String? _profileError(ConnectedProfileRow contact) {
     if (contact.profileJson == null) return null;
     try {
       final decoded = jsonDecode(contact.profileJson!) as Map<String, dynamic>;

@@ -99,7 +99,7 @@ class ConnectionRequestsScreen extends ConsumerWidget {
 
   Future<void> _sync(BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(connectionRepositoryProvider).sync();
+      await ref.read(syncServiceProvider).syncNow();
     } catch (error) {
       if (context.mounted) _showError(context, error);
     }

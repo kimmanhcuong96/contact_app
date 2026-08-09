@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 part 'app_database.g.dart';
 
@@ -107,6 +108,10 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<SharingProfileRow>> watchSharingProfiles() =>
       (select(sharingProfiles)..orderBy([(row) => OrderingTerm.asc(row.id)]))
           .watch();
+  Stream<ConnectedProfileRow?> watchConnectedProfile(String connectionId) =>
+      (select(connectedProfiles)
+            ..where((row) => row.connectionId.equals(connectionId)))
+          .watchSingleOrNull();
   Future<void> saveSharingProfile(
       {required String id,
       required String json,
@@ -167,6 +172,70 @@ class AppDatabase extends _$AppDatabase {
                 row.peerUserId.equals(peerUserId)))
           .go();
 
+  Future<String?> peerPublicKey(String connectionId) async =>
+      (await (select(appSettings)
+                ..where((row) => row.key.equals('peerPublicKey:$connectionId')))
+              .getSingleOrNull())
+          ?.value;
+
+  Future<bool> queuePeerKeyRefresh({
+    required String connectionId,
+    required String peerUserId,
+    required String profileSetId,
+    required String publicKey,
+  }) =>
+      transaction(() async {
+        if (await peerPublicKey(connectionId) == publicKey) return false;
+        final pending = await (select(pendingConnectionActions)
+              ..where((row) =>
+                  row.connectionId.equals(connectionId) &
+                  row.operation.equals('assign')))
+            .getSingleOrNull();
+        if (pending == null) {
+          await enqueueConnectionAction(
+            id: const Uuid().v4(),
+            operation: 'assign',
+            connectionId: connectionId,
+            peerUserId: peerUserId,
+            profileSetId: profileSetId,
+          );
+        }
+        await into(appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'peerPublicKey:$connectionId',
+            value: publicKey,
+          ),
+        );
+        return pending == null;
+      });
+
+  Future<bool> shouldRequestKeyRefresh(
+    String connectionId,
+    int version,
+  ) async =>
+      (await (select(appSettings)
+                ..where(
+                    (row) => row.key.equals('keyRefreshRequest:$connectionId')))
+              .getSingleOrNull())
+          ?.value !=
+      '$version';
+
+  Future<void> markKeyRefreshRequested(
+    String connectionId,
+    int version,
+  ) =>
+      into(appSettings).insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: 'keyRefreshRequest:$connectionId',
+          value: '$version',
+        ),
+      );
+
+  Future<void> clearKeyRefreshRequest(String connectionId) =>
+      (delete(appSettings)
+            ..where((row) => row.key.equals('keyRefreshRequest:$connectionId')))
+          .go();
+
   Future<void> scopeUserData(String userId) => transaction(() async {
         final owner = await (select(appSettings)
               ..where((row) => row.key.equals('localDataOwner')))
@@ -177,6 +246,11 @@ class AppDatabase extends _$AppDatabase {
         await delete(sharingProfiles).go();
         await delete(masterProfiles).go();
         await delete(pendingConnectionActions).go();
+        await (delete(appSettings)
+              ..where((row) =>
+                  row.key.like('peerPublicKey:%') |
+                  row.key.like('keyRefreshRequest:%')))
+            .go();
         await into(appSettings).insertOnConflictUpdate(
           AppSettingsCompanion.insert(
             key: 'localDataOwner',
