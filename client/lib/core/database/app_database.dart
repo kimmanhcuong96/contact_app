@@ -167,6 +167,24 @@ class AppDatabase extends _$AppDatabase {
                 row.peerUserId.equals(peerUserId)))
           .go();
 
+  Future<void> scopeUserData(String userId) => transaction(() async {
+        final owner = await (select(appSettings)
+              ..where((row) => row.key.equals('localDataOwner')))
+            .getSingleOrNull();
+        if (owner?.value == userId) return;
+
+        await delete(connectedProfiles).go();
+        await delete(sharingProfiles).go();
+        await delete(masterProfiles).go();
+        await delete(pendingConnectionActions).go();
+        await into(appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'localDataOwner',
+            value: userId,
+          ),
+        );
+      });
+
   Future<void> clearAll() => transaction(() async {
         await delete(connectedProfiles).go();
         await delete(sharingProfiles).go();

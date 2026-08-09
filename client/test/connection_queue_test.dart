@@ -33,4 +33,45 @@ void main() {
       'second',
     );
   });
+
+  test('clears user data when a different account signs in', () async {
+    await database.scopeUserData('old-user');
+    await database.enqueueConnectionAction(
+      id: 'stale-action',
+      operation: 'request',
+      peerUserId: 'old-peer',
+      profileSetId: 'old-profile',
+    );
+    await database.into(database.connectedProfiles).insert(
+          ConnectedProfilesCompanion.insert(
+            connectionId: 'old-connection',
+            peerUserId: 'old-peer',
+            status: 'connected',
+            direction: 'outgoing',
+            updatedAt: DateTime(2026),
+          ),
+        );
+    await database.into(database.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(key: 'theme', value: 'dark'),
+        );
+
+    await database.scopeUserData('new-user');
+
+    expect(await database.select(database.connectedProfiles).get(), isEmpty);
+    expect(await database.pendingConnectionQueue(), isEmpty);
+    expect(
+      (await (database.select(database.appSettings)
+                ..where((row) => row.key.equals('localDataOwner')))
+              .getSingle())
+          .value,
+      'new-user',
+    );
+    expect(
+      (await (database.select(database.appSettings)
+                ..where((row) => row.key.equals('theme')))
+              .getSingle())
+          .value,
+      'dark',
+    );
+  });
 }

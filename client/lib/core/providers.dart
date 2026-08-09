@@ -101,11 +101,42 @@ final localeProvider = FutureProvider<Locale>((ref) async {
 
 class SessionController extends AsyncNotifier<bool> {
   @override
-  Future<bool> build() => ref.read(apiClientProvider).hasSession;
+  Future<bool> build() async {
+    final api = ref.read(apiClientProvider);
+    if (!await api.hasSession) return false;
+
+    var userId = await ref
+        .read(secureStorageProvider)
+        .read(key: 'authenticated_user_id');
+    if (userId == null) {
+      try {
+        final account = await ref.read(authRepositoryProvider).getAccount();
+        userId = account['id'] as String;
+        await ref
+            .read(secureStorageProvider)
+            .write(key: 'authenticated_user_id', value: userId);
+      } catch (_) {
+        // Keep an existing session usable offline. The next successful login
+        // or online startup will establish ownership of the local cache.
+        return true;
+      }
+    }
+
+    await ref.read(databaseProvider).scopeUserData(userId);
+    await ref.read(profileRepositoryProvider).initializeDefaults();
+    return true;
+  }
+
   Future<void> login(String identifier, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await ref.read(authRepositoryProvider).login(identifier, password);
+      final account = await ref.read(authRepositoryProvider).getAccount();
+      final userId = account['id'] as String;
+      await ref
+          .read(secureStorageProvider)
+          .write(key: 'authenticated_user_id', value: userId);
+      await ref.read(databaseProvider).scopeUserData(userId);
       await ref.read(profileRepositoryProvider).initializeDefaults();
       return true;
     });
