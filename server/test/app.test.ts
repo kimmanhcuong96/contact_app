@@ -6,6 +6,7 @@ import type { Env } from '../src/types';
 const env: Env = {
   DATABASE_URL: 'postgresql://unused:unused@localhost/unused',
   JWT_SECRET: 'a-secure-test-secret-that-is-long-enough',
+  DATA_ENCRYPTION_KEY: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
   APP_ORIGIN: 'http://localhost:3000',
 };
 
@@ -22,16 +23,16 @@ describe('HTTP boundary', () => {
     await expect(response.json()).resolves.toEqual({ country: null });
   });
 
-  it('requires authentication for encrypted profile sets', async () => {
+  it('requires authentication for profile sets', async () => {
     const response = await app.request('/v1/profile-sets', {}, env);
     expect(response.status).toBe(401);
   });
 
-  it('rejects plaintext-shaped profile uploads at validation boundary', async () => {
+  it('rejects legacy client-encrypted profile uploads at validation boundary', async () => {
     const accessToken = await createAccessToken('9ddc2743-cfbd-4f63-9a3f-e2fd4c640bee', env.JWT_SECRET);
     const response = await app.request('/v1/profile-sets/29920277-28ca-4c6e-893b-7d3e6fcd5556', {
       method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version: 1, fullName: 'must never reach storage' }),
+      body: JSON.stringify({ version: 1, encryptedBlob: { algorithm: 'AES-256-GCM', nonce: 'legacy-nonce', ciphertext: 'legacy-value' } }),
     }, env);
     expect(response.status).toBe(422);
   });

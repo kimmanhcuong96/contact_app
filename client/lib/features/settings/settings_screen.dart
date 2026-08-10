@@ -102,9 +102,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: Text(l10n.t('automaticSync')),
             subtitle: Text(l10n.t('automaticSyncHint')),
             value: autoSync,
-            onChanged: (value) {
+            onChanged: (value) async {
               setState(() => autoSync = value);
-              _store('autoSync', '$value');
+              await _store('autoSync', '$value');
+              if (value) {
+                ref.read(syncServiceProvider).requestAutomaticSync();
+              }
             }),
         ListTile(
             title: Text(l10n.t('theme')),

@@ -12,10 +12,10 @@ export class ConnectionRepository {
   findPair(a: string, b: string) {
     return this.db.query.connections.findFirst({ where: or(and(eq(connections.requesterId, a), eq(connections.addresseeId, b)), and(eq(connections.requesterId, b), eq(connections.addresseeId, a))) });
   }
-  findUserKey(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id), columns: { id: true, publicKey: true } }); }
+  findUser(id: string) { return this.db.query.users.findFirst({ where: eq(users.id, id), columns: { id: true } }); }
   findUsernames(ids: string[]) {
     if (ids.length === 0) return Promise.resolve([]);
-    return this.db.select({ id: users.id, username: users.username, publicKey: users.publicKey }).from(users).where(inArray(users.id, ids));
+    return this.db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, ids));
   }
   findOwnedProfileByClientId(clientId: string, ownerId: string) {
     return this.db.query.profileSets.findFirst({
@@ -23,8 +23,8 @@ export class ConnectionRepository {
       columns: { id: true },
     });
   }
-  create(requesterId: string, addresseeId: string, requesterProfileSetId: string, requesterKeyEnvelope: unknown) {
-    return this.db.insert(connections).values({ requesterId, addresseeId, requesterProfileSetId, requesterKeyEnvelope }).returning().then((rows) => rows[0]);
+  create(requesterId: string, addresseeId: string, requesterProfileSetId: string) {
+    return this.db.insert(connections).values({ requesterId, addresseeId, requesterProfileSetId }).returning().then((rows) => rows[0]);
   }
   update(id: string, values: Partial<typeof connections.$inferInsert>) {
     return this.db.update(connections).set({ ...values, updatedAt: new Date() }).where(eq(connections.id, id)).returning().then((rows) => rows[0]);

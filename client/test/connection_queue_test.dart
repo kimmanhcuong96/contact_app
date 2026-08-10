@@ -75,29 +75,4 @@ void main() {
     );
   });
 
-  test('queues one profile-key refresh for a changed peer identity', () async {
-    expect(
-      await database.queuePeerKeyRefresh(
-        connectionId: 'connection-id',
-        peerUserId: 'peer-id',
-        profileSetId: 'profile-id',
-        publicKey: 'new-public-key',
-      ),
-      isTrue,
-    );
-    expect(
-      await database.queuePeerKeyRefresh(
-        connectionId: 'connection-id',
-        peerUserId: 'peer-id',
-        profileSetId: 'profile-id',
-        publicKey: 'new-public-key',
-      ),
-      isFalse,
-    );
-
-    final pending = await database.pendingConnectionQueue();
-    expect(pending, hasLength(1));
-    expect(pending.single.operation, 'assign');
-    expect(pending.single.profileSetId, 'profile-id');
-  });
 }

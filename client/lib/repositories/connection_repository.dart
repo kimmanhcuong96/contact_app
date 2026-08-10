@@ -2,21 +2,17 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/database/app_database.dart';
 import '../core/network/api_client.dart';
-import '../core/security/crypto_service.dart';
-import '../models/encryption_models.dart';
 import 'profile_repository.dart';
 
 class ConnectionRepository {
-  ConnectionRepository(this.database, this.api, this.crypto, this.profiles);
+  ConnectionRepository(this.database, this.api, this.profiles);
 
   final AppDatabase database;
   final ApiClient api;
-  final CryptoService crypto;
   final ProfileRepository profiles;
   final _uuid = const Uuid();
 
@@ -219,11 +215,9 @@ class ConnectionRepository {
         throw PendingConnectionActionException(pending.operation);
       }
       final sharing = await _sharingProfile(profileSetId!, pending.operation);
-      final envelope = await _keyEnvelope(sharing, peerUserId);
       await api.dio.post<void>('/connections', data: {
         'peerUserId': peerUserId,
         'profileSetId': sharing.id,
-        'keyEnvelope': envelope,
       });
       return;
     }
@@ -234,17 +228,11 @@ class ConnectionRepository {
     final sharing = profileSetId == null
         ? null
         : await _sharingProfile(profileSetId, pending.operation);
-    final peerUserId = sharing == null
-        ? null
-        : await _resolvePeerUserId(pending, connectionId!);
-    final envelope =
-        sharing == null ? null : await _keyEnvelope(sharing, peerUserId!);
     await api.dio.put<void>(
       '/connections/$connectionId',
       data: {
         'action': pending.operation,
         if (sharing != null) 'profileSetId': sharing.id,
-        if (envelope != null) 'keyEnvelope': envelope,
       },
     );
   }
@@ -264,53 +252,22 @@ class ConnectionRepository {
     final response = await api.dio.get<Map<String, dynamic>>('/connections');
     final items = response.data!['items'] as List;
     final seen = <String>{};
-    var queuedKeyRefresh = false;
-    final failedDecryptions = <(String, int)>[];
     for (final raw in items) {
       final item = Map<String, dynamic>.from(raw as Map);
       final connectionId = item['id'] as String;
       final peerUserId = item['peerUserId'] as String;
-      final peerPublicKey = item['peerPublicKey'] as String?;
       seen.add(connectionId);
       String? profileJson;
       final profile = item['profile'] as Map?;
-      final keyEnvelope = item['keyEnvelope'] as Map?;
-      if (profile != null && keyEnvelope != null) {
-        try {
-          final key = await crypto.unwrapKey(WrappedKeyEnvelope.fromJson(
-              Map<String, dynamic>.from(keyEnvelope)));
-          final clear = await crypto.decryptJson(
-            EncryptedEnvelope.fromJson(
-                Map<String, dynamic>.from(profile['encryptedBlob'] as Map)),
-            key,
-          );
-          profileJson = jsonEncode(clear);
-          await database.clearKeyRefreshRequest(connectionId);
-        } catch (error, stackTrace) {
-          debugPrint(
-              'Unable to decrypt profile for connection $connectionId: $error\n$stackTrace');
-          profileJson = jsonEncode({
-            'fields': <String, String>{},
-            'error': 'decryption_failed',
-          });
-          failedDecryptions.add((
-            connectionId,
-            (profile['version'] as num?)?.toInt() ?? 0,
-          ));
-        }
+      if (profile != null && profile['data'] is Map) {
+        profileJson = jsonEncode(profile['data']);
+      } else if (item['profileMigrationRequired'] == true) {
+        profileJson = jsonEncode({
+          'fields': <String, String>{},
+          'error': 'migration_pending',
+        });
       }
       final assignedProfileId = item['assignedProfileClientId'] as String?;
-      if (item['status'] == 'connected' &&
-          assignedProfileId != null &&
-          peerPublicKey != null) {
-        queuedKeyRefresh = await database.queuePeerKeyRefresh(
-              connectionId: connectionId,
-              peerUserId: peerUserId,
-              profileSetId: assignedProfileId,
-              publicKey: peerPublicKey,
-            ) ||
-            queuedKeyRefresh;
-      }
       await database.into(database.connectedProfiles).insertOnConflictUpdate(
             ConnectedProfilesCompanion.insert(
               connectionId: connectionId,
@@ -338,22 +295,6 @@ class ConnectionRepository {
         !seen.contains(row.connectionId))) {
       await _removeLocalConnection(row.connectionId);
     }
-    if (queuedKeyRefresh) await flushPendingActions();
-    for (final failure in failedDecryptions) {
-      if (!await database.shouldRequestKeyRefresh(failure.$1, failure.$2)) {
-        continue;
-      }
-      try {
-        await api.dio.put<void>(
-          '/connections/${failure.$1}',
-          data: {'action': 'request_key_refresh'},
-        );
-        await database.markKeyRefreshRequested(failure.$1, failure.$2);
-      } catch (error, stackTrace) {
-        debugPrint(
-            'Unable to request key refresh for ${failure.$1}: $error\n$stackTrace');
-      }
-    }
   }
 
   Future<SharingProfileRow> _sharingProfile(
@@ -365,31 +306,6 @@ class ConnectionRepository {
         .getSingleOrNull();
     if (sharing == null) throw PendingConnectionActionException(operation);
     return sharing;
-  }
-
-  Future<String> _resolvePeerUserId(
-    PendingConnectionActionRow pending,
-    String connectionId,
-  ) async {
-    if (pending.peerUserId != null) return pending.peerUserId!;
-    final connection = await (database.select(database.connectedProfiles)
-          ..where((row) => row.connectionId.equals(connectionId)))
-        .getSingleOrNull();
-    if (connection == null) {
-      throw PendingConnectionActionException(pending.operation);
-    }
-    return connection.peerUserId;
-  }
-
-  Future<Map<String, dynamic>> _keyEnvelope(
-      SharingProfileRow sharing, String peerUserId) async {
-    final keyResponse =
-        await api.dio.get<Map<String, dynamic>>('/users/$peerUserId/key');
-    return (await crypto.wrapKey(
-      crypto.decodeKey(sharing.keyBase64),
-      keyResponse.data!['publicKey'] as String,
-    ))
-        .toJson();
   }
 
   Future<void> _applyOptimisticAction(

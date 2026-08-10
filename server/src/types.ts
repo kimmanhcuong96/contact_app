@@ -3,6 +3,9 @@ import type { Database } from './database/client';
 export interface Env {
   DATABASE_URL: string;
   JWT_SECRET: string;
+  DATA_ENCRYPTION_KEY: string;
+  DATA_ENCRYPTION_KEY_ID?: string;
+  DATA_ENCRYPTION_PREVIOUS_KEYS?: string;
   APP_ORIGIN: string;
   ACCESS_TOKEN_TTL_SECONDS?: string;
   REFRESH_TOKEN_TTL_DAYS?: string;

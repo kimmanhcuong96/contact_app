@@ -10,7 +10,8 @@ import 'package:nexbook/core/database/app_database.dart';
 import 'package:nexbook/core/localization/app_localizations.dart';
 import 'package:nexbook/core/network/api_client.dart';
 import 'package:nexbook/core/network/localized_error.dart';
-import 'package:nexbook/core/security/crypto_service.dart';
+import 'package:nexbook/core/sync/sync_service.dart';
+import 'package:nexbook/models/master_profile.dart';
 import 'package:nexbook/repositories/profile_repository.dart';
 import 'package:nexbook/repositories/connection_repository.dart';
 import 'package:flutter/widgets.dart';
@@ -25,11 +26,9 @@ void main() {
 
   test('uploads a missing sharing profile without a master profile', () async {
     const storage = FlutterSecureStorage();
-    final crypto = CryptoService(storage);
     final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
     final adapter = _RecordingAdapter();
     api.dio.httpClientAdapter = adapter;
-    final key = await crypto.encodeKey(await crypto.newProfileKey());
     await database.saveSharingProfile(
       id: 'b87f598f-a41a-4b04-aa48-bf6b2310d024',
       json: jsonEncode({
@@ -38,12 +37,12 @@ void main() {
         'visibleFields': ['fullName'],
         'version': 1,
       }),
-      keyBase64: key,
+      keyBase64: '',
       version: 1,
       dirty: false,
     );
 
-    await ProfileRepository(database, api, crypto).sync();
+    await ProfileRepository(database, api).sync();
 
     expect(adapter.requests.map((request) => request.path), [
       '/profile-sets',
@@ -51,9 +50,85 @@ void main() {
     ]);
     final upload = adapter.requests.last.data as Map<String, dynamic>;
     expect(upload['version'], 1);
-    expect(upload['encryptedBlob'], containsPair('algorithm', 'AES-256-GCM'));
+    expect(upload['data'], {
+      'fields': <String, String>{},
+    });
     expect((await database.select(database.sharingProfiles).getSingle()).dirty,
         isFalse);
+  });
+
+  test('automatically syncs after the user updates the master profile',
+      () async {
+    const storage = FlutterSecureStorage();
+    final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
+    final adapter = _RecordingAdapter();
+    api.dio.httpClientAdapter = adapter;
+    const profileId = 'b87f598f-a41a-4b04-aa48-bf6b2310d024';
+    await database.saveSharingProfile(
+      id: profileId,
+      json: jsonEncode({
+        'id': profileId,
+        'name': 'Public',
+        'visibleFields': ['fullName'],
+        'version': 1,
+      }),
+      keyBase64: '',
+      version: 1,
+      dirty: false,
+    );
+    final profiles = ProfileRepository(database, api);
+    final connections = ConnectionRepository(database, api, profiles);
+    final sync = SyncService(
+      profiles,
+      connections,
+      database,
+      changeDebounce: Duration.zero,
+    )..start(syncOnStart: false, monitorConnectivity: false);
+    final completed = sync.statuses.firstWhere((status) => !status.isSyncing);
+
+    await profiles.saveMaster(
+      const MasterProfile(fields: {'fullName': 'Nguyen Van A'}),
+    );
+    await completed.timeout(const Duration(seconds: 2));
+
+    final upload = adapter.requests.firstWhere(
+      (request) =>
+          request.method == 'PUT' && request.path == '/profile-sets/$profileId',
+    );
+    expect((upload.data as Map)['data'], {
+      'fields': {'fullName': 'Nguyen Van A'},
+    });
+    await sync.dispose();
+    await profiles.dispose();
+  });
+
+  test('keeps manual sync available when automatic sync is disabled', () async {
+    const storage = FlutterSecureStorage();
+    final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
+    final adapter = _RecordingAdapter();
+    api.dio.httpClientAdapter = adapter;
+    await database.into(database.appSettings).insert(
+          AppSettingsCompanion.insert(key: 'autoSync', value: 'false'),
+        );
+    final profiles = ProfileRepository(database, api);
+    final connections = ConnectionRepository(database, api, profiles);
+    final sync = SyncService(
+      profiles,
+      connections,
+      database,
+      changeDebounce: Duration.zero,
+    )..start(syncOnStart: false, monitorConnectivity: false);
+
+    await profiles.saveMaster(
+      const MasterProfile(fields: {'fullName': 'Local only'}),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(adapter.requests, isEmpty);
+
+    await sync.syncNow();
+    expect(adapter.requests, isNotEmpty);
+    await sync.dispose();
+    await profiles.dispose();
   });
 
   test('does not delete a sharing profile assigned to a contact', () async {
@@ -72,8 +147,7 @@ void main() {
         );
 
     await expectLater(
-      ProfileRepository(database, api, CryptoService(storage))
-          .deleteSharing(profileId),
+      ProfileRepository(database, api).deleteSharing(profileId),
       throwsA(isA<SharingProfileInUseException>()),
     );
   });
@@ -81,12 +155,10 @@ void main() {
   test('recovers a dirty profile when the server already has its version',
       () async {
     const storage = FlutterSecureStorage();
-    final crypto = CryptoService(storage);
     final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
     final adapter = _ProfileVersionAdapter();
     api.dio.httpClientAdapter = adapter;
     const profileId = 'b87f598f-a41a-4b04-aa48-bf6b2310d024';
-    final key = await crypto.encodeKey(await crypto.newProfileKey());
     await database.saveSharingProfile(
       id: profileId,
       json: jsonEncode({
@@ -95,11 +167,11 @@ void main() {
         'visibleFields': ['fullName'],
         'version': 2,
       }),
-      keyBase64: key,
+      keyBase64: '',
       version: 2,
     );
 
-    await ProfileRepository(database, api, crypto).sync();
+    await ProfileRepository(database, api).sync();
 
     expect(adapter.uploadedVersions, [3]);
     final saved = await database.select(database.sharingProfiles).getSingle();
@@ -124,30 +196,25 @@ void main() {
     expect(message, contains('NexBook'));
   });
 
-  test('keeps syncing when one connected profile cannot be decrypted',
-      () async {
+  test('keeps syncing while a legacy profile awaits owner migration', () async {
     const storage = FlutterSecureStorage();
-    final crypto = CryptoService(storage);
     final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
     api.dio.httpClientAdapter = _ConnectionAdapter();
-    final profiles = ProfileRepository(database, api, crypto);
+    final profiles = ProfileRepository(database, api);
 
-    await ConnectionRepository(database, api, crypto, profiles).sync();
+    await ConnectionRepository(database, api, profiles).sync();
 
     final contact =
         await database.select(database.connectedProfiles).getSingle();
     expect(contact.peerUsername, 'peer.user');
-    expect(jsonDecode(contact.profileJson!)['error'], 'decryption_failed');
+    expect(jsonDecode(contact.profileJson!)['error'], 'migration_pending');
   });
 
-  test('repairs a legacy queued assignment that has no peer user id', () async {
+  test('sends a queued assignment without a peer encryption key', () async {
     const storage = FlutterSecureStorage();
-    final crypto = CryptoService(storage);
     final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
-    final publicKey = await crypto.publicIdentityBase64();
-    final adapter = _LegacyQueueAdapter(publicKey);
+    final adapter = _LegacyQueueAdapter();
     api.dio.httpClientAdapter = adapter;
-    final key = await crypto.encodeKey(await crypto.newProfileKey());
     await database.saveSharingProfile(
       id: 'profile-id',
       json: jsonEncode({
@@ -156,7 +223,7 @@ void main() {
         'visibleFields': ['fullName'],
         'version': 1,
       }),
-      keyBase64: key,
+      keyBase64: '',
       version: 1,
       dirty: false,
     );
@@ -177,19 +244,18 @@ void main() {
       profileSetId: 'profile-id',
     );
 
-    final profiles = ProfileRepository(database, api, crypto);
-    await ConnectionRepository(database, api, crypto, profiles).sync();
+    final profiles = ProfileRepository(database, api);
+    await ConnectionRepository(database, api, profiles).sync();
 
     expect(await database.pendingConnectionQueue(), isEmpty);
-    expect(adapter.assignedPeerKeyRequests, 1);
+    expect(adapter.assignedRequests, 1);
   });
 
   test('discards an unrecoverable queued action and does not fail again',
       () async {
     const storage = FlutterSecureStorage();
-    final crypto = CryptoService(storage);
     final api = ApiClient(storage, baseUrl: 'https://example.test/v1');
-    api.dio.httpClientAdapter = _LegacyQueueAdapter('unused');
+    api.dio.httpClientAdapter = _LegacyQueueAdapter();
     await database.enqueueConnectionAction(
       id: 'stale-action',
       operation: 'assign',
@@ -197,8 +263,8 @@ void main() {
       peerUserId: 'peer-id',
       profileSetId: 'deleted-profile',
     );
-    final profiles = ProfileRepository(database, api, crypto);
-    final connections = ConnectionRepository(database, api, crypto, profiles);
+    final profiles = ProfileRepository(database, api);
+    final connections = ConnectionRepository(database, api, profiles);
 
     await expectLater(
       connections.sync(),
@@ -289,19 +355,8 @@ class _ConnectionAdapter implements HttpClientAdapter {
             'assignedProfileClientId': null,
             'status': 'connected',
             'direction': 'incoming',
-            'keyEnvelope': {
-              'ephemeralPublicKey': 'invalid',
-              'nonce': 'invalid',
-              'ciphertext': 'invalid',
-            },
-            'profile': {
-              'version': 1,
-              'encryptedBlob': {
-                'algorithm': 'AES-256-GCM',
-                'nonce': 'invalid',
-                'ciphertext': 'invalid',
-              },
-            },
+            'profile': null,
+            'profileMigrationRequired': true,
             'updatedAt': '2026-08-09T00:00:00.000Z',
           }
         ],
@@ -318,10 +373,7 @@ class _ConnectionAdapter implements HttpClientAdapter {
 }
 
 class _LegacyQueueAdapter implements HttpClientAdapter {
-  _LegacyQueueAdapter(this.publicKey);
-
-  final String publicKey;
-  int assignedPeerKeyRequests = 0;
+  int assignedRequests = 0;
 
   @override
   Future<ResponseBody> fetch(
@@ -330,9 +382,9 @@ class _LegacyQueueAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     Object body = <String, dynamic>{};
-    if (options.path == '/users/peer-id/key') {
-      assignedPeerKeyRequests++;
-      body = {'userId': 'peer-id', 'publicKey': publicKey};
+    if (options.method == 'PUT' &&
+        options.path == '/connections/connection-id') {
+      assignedRequests++;
     } else if (options.method == 'GET' && options.path == '/connections') {
       body = {'items': <Object>[]};
     }

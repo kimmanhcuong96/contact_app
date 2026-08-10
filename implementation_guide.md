@@ -99,17 +99,19 @@ Domain:
 # Encryption
 
 * AES-256-GCM
-* End-to-End Encryption
-* Encryption and decryption MUST happen on the client only.
-* Backend MUST NEVER access plaintext profile data.
+* Server-managed AES-256-GCM encryption at rest
+* HKDF-SHA256 per-profile key derivation with random salt and nonce
+* Master key stored only as a Cloudflare Worker secret
+* Backend decrypts only after authorization and MUST NEVER log plaintext profile data
+* Ciphertext envelopes carry a format version and key ID for migration/rotation
 
 ---
 
 # Architecture Rules
 
-* Thin Backend
-* Fat Client
-* Zero Knowledge Server
+* Stateless Backend
+* Offline-first Client
+* Database-compromise Protection
 * Offline First
 * REST API Only
 * Clean Architecture
@@ -123,7 +125,6 @@ Domain:
 * Master Profile
 * Sharing Profile
 * Generate Profile Views
-* Encrypt / Decrypt
 * Local Database
 * Synchronization
 * QR
@@ -136,6 +137,7 @@ Domain:
 * Authentication
 * User Management
 * Connection Management
+* Authorized Profile Encryption / Decryption
 * Encrypted Blob Storage
 * Push Notification
 * Email

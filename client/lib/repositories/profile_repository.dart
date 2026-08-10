@@ -5,16 +5,17 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../core/database/app_database.dart' as db;
 import '../core/network/api_client.dart';
-import '../core/security/crypto_service.dart';
 import '../models/master_profile.dart';
 import '../models/sharing_profile.dart';
 
 class ProfileRepository {
-  ProfileRepository(this.database, this.api, this.crypto);
+  ProfileRepository(this.database, this.api);
   final db.AppDatabase database;
   final ApiClient api;
-  final CryptoService crypto;
   Future<void>? _activeSync;
+  final _localChanges = StreamController<void>.broadcast();
+
+  Stream<void> get localChanges => _localChanges.stream;
 
   Stream<MasterProfile> watchMaster() =>
       database.watchMasterProfile().map((row) =>
@@ -59,19 +60,19 @@ class ProfileRepository {
           keyBase64: row.keyBase64,
           version: item.version);
     }
+    _localChanges.add(null);
   }
 
   Future<void> saveSharing(SharingProfile profile) async {
     final existing = await (database.select(database.sharingProfiles)
           ..where((row) => row.id.equals(profile.id)))
         .getSingleOrNull();
-    final key = existing?.keyBase64 ??
-        await crypto.encodeKey(await crypto.newProfileKey());
     await database.saveSharingProfile(
         id: profile.id,
         json: profile.encode(),
-        keyBase64: key,
+        keyBase64: existing?.keyBase64 ?? '',
         version: profile.version);
+    _localChanges.add(null);
   }
 
   Future<void> deleteSharing(String id) async {
@@ -109,8 +110,10 @@ class ProfileRepository {
         (raw as Map)['clientId'] as String: Map<String, dynamic>.from(raw),
     };
     final localRows = await database.select(database.sharingProfiles).get();
-    for (final row in localRows
-        .where((row) => row.dirty || !remoteByClientId.containsKey(row.id))) {
+    for (final row in localRows.where((row) =>
+        row.dirty ||
+        !remoteByClientId.containsKey(row.id) ||
+        remoteByClientId[row.id]?['migrationRequired'] == true)) {
       var sharing = SharingProfile.decode(row.json);
       try {
         final remoteVersion =
@@ -129,10 +132,8 @@ class ProfileRepository {
                 entry.key: entry.value
           }
         };
-        final encrypted =
-            await crypto.encryptJson(view, crypto.decodeKey(row.keyBase64));
         try {
-          await _put(row.id, sharing.version, encrypted.toJson());
+          await _put(row.id, sharing.version, view);
         } on DioException catch (error) {
           if (!_isVersionConflict(error)) rethrow;
           final remote = await api.dio
@@ -145,7 +146,7 @@ class ProfileRepository {
                 ? serverVersion + 1
                 : sharing.version + 1,
           );
-          await _put(row.id, sharing.version, encrypted.toJson());
+          await _put(row.id, sharing.version, view);
         }
         await database.markProfileSynced(row.id);
       } catch (error, stackTrace) {
@@ -175,11 +176,11 @@ class ProfileRepository {
   Future<void> _put(
     String id,
     int version,
-    Map<String, dynamic> encryptedBlob,
+    Map<String, dynamic> data,
   ) =>
       api.dio.put<void>('/profile-sets/$id', data: {
         'version': version,
-        'encryptedBlob': encryptedBlob,
+        'data': data,
       });
 
   bool _isVersionConflict(DioException error) {
@@ -226,6 +227,8 @@ class ProfileRepository {
               key: entry.key, value: '${entry.value}'));
     }
   }
+
+  Future<void> dispose() => _localChanges.close();
 }
 
 class SharingProfileInUseException implements Exception {

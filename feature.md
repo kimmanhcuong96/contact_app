@@ -33,8 +33,8 @@ Anyone who wants to exchange and maintain contact information securely.
 # Core Principles
 
 * Privacy First
-* End-to-End Encryption
-* Zero Knowledge Server
+* Encrypted Database Storage
+* Server-managed Key
 * Offline First
 * Cross Platform
 * Simple UX
@@ -197,18 +197,16 @@ When profile changes:
 Client:
 
 * Generate profile views
-* Encrypt
-* Upload
+* Upload field-filtered views over HTTPS
 
 Server:
 
-* Store encrypted data
+* Authorize, encrypt, and store data
 * Notify connected users
 
 Other clients:
 
-* Download
-* Decrypt
+* Download authorized profile data over HTTPS
 * Update local data
 
 Synchronization is automatic.
@@ -314,6 +312,8 @@ Application provides:
 * Refresh token
 * HTTPS only
 * Rate limiting
+* AES-256-GCM profile encryption at rest
+* Per-profile key derivation and key rotation support
 
 ---
 

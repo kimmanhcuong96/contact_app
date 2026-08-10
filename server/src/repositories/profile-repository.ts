@@ -6,7 +6,7 @@ export class ProfileRepository {
   constructor(private db: Database) {}
 
   list(ownerId: string) {
-    return this.db.select({ id: profileSets.id, clientId: profileSets.clientId, version: profileSets.version, updatedAt: profileSets.updatedAt }).from(profileSets).where(eq(profileSets.ownerId, ownerId));
+    return this.db.select({ id: profileSets.id, clientId: profileSets.clientId, encryptedBlob: profileSets.encryptedBlob, version: profileSets.version, updatedAt: profileSets.updatedAt }).from(profileSets).where(eq(profileSets.ownerId, ownerId));
   }
   find(ownerId: string, clientId: string) {
     return this.db.query.profileSets.findFirst({ where: and(eq(profileSets.ownerId, ownerId), eq(profileSets.clientId, clientId)) });

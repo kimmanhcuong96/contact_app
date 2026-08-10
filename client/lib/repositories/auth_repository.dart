@@ -1,11 +1,9 @@
 import '../core/network/api_client.dart';
-import '../core/security/crypto_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthRepository {
-  AuthRepository(this.api, this.crypto);
+  AuthRepository(this.api);
   final ApiClient api;
-  final CryptoService crypto;
 
   Future<void> register(String username, String recoveryEmail, String password,
       String passwordConfirmation) async {
@@ -50,8 +48,6 @@ class AuthRepository {
 
   Future<void> _completeAuthentication(Map<String, dynamic> tokens) async {
     await api.saveTokens(tokens);
-    await api.dio.put<void>('/me/key',
-        data: {'publicKey': await crypto.publicIdentityBase64()});
   }
 
   Future<void> logout() async {

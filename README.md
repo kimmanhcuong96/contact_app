@@ -1,6 +1,6 @@
 # NexBook
 
-NexBook is a privacy-first personal contact application. Personal profile data is encrypted on the Flutter client with AES-256-GCM; the Cloudflare Workers API only receives opaque ciphertext and synchronization metadata.
+NexBook is a privacy-focused personal contact application. The Cloudflare Workers API encrypts profile data with AES-256-GCM before storing it, so a database-only compromise does not expose profile contents while the API can still perform authorized business operations.
 
 ## Repository
 
@@ -18,7 +18,7 @@ copy server\.dev.vars.example server\.dev.vars
 corepack pnpm --dir server dev
 ```
 
-Create a PostgreSQL database, set `DATABASE_URL`, then apply `server/drizzle/0000_initial.sql`. See [server/README.md](server/README.md).
+Create a PostgreSQL database, set `DATABASE_URL`, then apply all migrations in `server/drizzle/` in order. See [server/README.md](server/README.md).
 
 ### Flutter
 
@@ -33,10 +33,10 @@ The app can be explored offline without an account; server-backed actions requir
 
 ## Security model
 
-- The master profile and encryption key live only on the client.
-- A separately encrypted profile view is generated for each sharing profile.
+- The client generates the field-filtered view for each sharing profile and sends it over HTTPS.
+- The API derives a per-profile AES-256-GCM key from a master secret and encrypts every stored profile view.
 - QR codes contain only a user UUID.
-- The API validates authorization and never logs or decrypts profile blobs.
+- The API decrypts profile data only after authorization and never logs plaintext profile content.
 - Refresh tokens and verification/reset tokens are stored as SHA-256 hashes.
 
-Production deployments must use HTTPS, secure secrets, a real Resend/FCM configuration, and database migrations.
+Production deployments must use HTTPS, a Cloudflare secret named `DATA_ENCRYPTION_KEY`, secure secret rotation, a real Resend/FCM configuration, and database migrations. This model protects against database-only disclosure; compromise of both the Worker and its secrets can expose data.

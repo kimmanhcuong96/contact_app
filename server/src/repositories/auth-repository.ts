@@ -24,7 +24,6 @@ export class AuthRepository {
   updateRecoveryEmail(id: string, recoveryEmail: string) {
     return this.db.update(users).set({ recoveryEmail }).where(eq(users.id, id));
   }
-  updatePublicKey(id: string, publicKey: string) { return this.db.update(users).set({ publicKey }).where(eq(users.id, id)); }
   deleteUser(id: string) { return this.db.delete(users).where(eq(users.id, id)); }
 
   createOneTimeToken(userId: string, kind: string, tokenHash: string, expiresAt: Date) {

@@ -2,16 +2,15 @@
 
 # Architecture
 
-Privacy-first, End-to-End Encrypted, Thin Backend architecture.
+Privacy-focused, server-managed application-layer encryption architecture.
 
 ---
 
 # Design Principles
 
-* Zero Knowledge Server
-* End-to-End Encryption
-* Thin Backend
-* Fat Client
+* Encryption at Rest
+* Server-managed Key
+* Authorized Server Processing
 * Offline First
 * REST API Only
 * Cross Platform
@@ -93,13 +92,11 @@ Responsible for:
 * Local Database
 * Local Cache
 * Generate Profile Views
-* Encrypt
-* Decrypt
 * Synchronization
 * QR
 * Business Logic
 
-Client owns all user data.
+Client owns profile editing, field selection, offline storage, and synchronization state.
 
 ---
 
@@ -111,12 +108,13 @@ Responsible for:
 * JWT
 * User Account
 * Connection Management
-* Blob Storage
+* Authorized Profile Encryption / Decryption
+* Encrypted Blob Storage
 * Push Notification
 * Email
 * Authorization
 
-Backend MUST NOT process profile content.
+Backend MUST authorize every profile read before decrypting it and MUST NOT log plaintext profile content.
 
 ---
 
@@ -134,23 +132,15 @@ Database MUST NOT store plaintext profile.
 
 ---
 
-# Zero Knowledge Server
+# Threat Model
 
-Server never knows:
+The API can process an authorized sharing view, including its selected contact fields.
 
-* Name
-* Phone
-* Birthday
-* Address
-* Facebook
-* LinkedIn
-* Notes
-
-Server only stores encrypted blobs.
+The database stores encrypted profile blobs. An attacker who obtains a database dump without the Worker secret cannot read profile content. The server can decrypt authorized data, so this is not end-to-end or zero-knowledge encryption. A compromise of the Worker runtime together with its encryption secret can expose profile data.
 
 ---
 
-# End-to-End Encryption
+# Server-managed Encryption
 
 Flow:
 
@@ -159,24 +149,24 @@ Master Profile
       │
 Generate Profile Views
       │
-Encrypt
+Upload via HTTPS
       │
-Encrypted Blob
+Authorize and encrypt
       │
-Upload
+Store ciphertext
 ```
 
 Download:
 
 ```text
-Download Blob
+Authorize and load ciphertext
       │
-Decrypt
+Decrypt and return via HTTPS
       │
 Display
 ```
 
-Only clients can encrypt or decrypt.
+The API encrypts and decrypts profile views using AES-256-GCM, random nonces, HKDF-SHA256 per-profile key derivation, authenticated record context, and key IDs for rotation.
 
 ---
 
@@ -188,7 +178,7 @@ Each user owns:
 Master Profile
 ```
 
-Master Profile never leaves client as plaintext.
+The complete Master Profile remains local; only field-filtered sharing views leave the client via HTTPS.
 
 ---
 
@@ -222,7 +212,7 @@ Master Profile
 └── Public View
 ```
 
-Each Profile View is encrypted independently.
+Each Profile View is encrypted independently by the API before database storage.
 
 ---
 
@@ -230,7 +220,7 @@ Each Profile View is encrypted independently.
 
 Server stores encrypted Profile Sets.
 
-Server does not understand their content.
+The API can decrypt their content only inside authorized request handling.
 
 Connection references one Profile Set.
 
@@ -457,7 +447,6 @@ MUST:
 MUST NOT:
 
 * Store plaintext profile
-* Decrypt profile
 * Log profile content
 
 ---
@@ -466,7 +455,7 @@ MUST NOT:
 
 Backend MUST remain stateless.
 
-Backend MUST remain thin.
+Backend MUST remain stateless and own the encryption-at-rest boundary.
 
 Business logic belongs to client.
 
@@ -474,7 +463,7 @@ Adding profile fields MUST NOT require backend changes.
 
 Sharing Profile is the only visibility mechanism.
 
-All encrypted data is treated as opaque blobs.
+Only the encryption service handles stored ciphertext; business services receive authorized plaintext profile views.
 
 ---
 
@@ -542,10 +531,10 @@ Architecture intentionally excludes:
 
 # Architecture Summary
 
-The client owns all personal data and business logic.
+The client owns profile editing, sharing selection, offline state, and view generation.
 
-The backend manages authentication, connections, synchronization and encrypted storage.
+The backend manages authentication, authorization, connections, synchronization, and server-managed encrypted storage.
 
-The server never has access to plaintext profile data.
+The server decrypts profile views only after authorization and never logs plaintext content.
 
 This architecture minimizes backend complexity, operating cost and privacy risks while remaining easy to extend in future versions.

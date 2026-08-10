@@ -3,6 +3,9 @@ import type { ConnectionRepository } from '../src/repositories/connection-reposi
 import type { NotificationService } from '../src/services/notification-service';
 import { ConnectionService } from '../src/services/connection-service';
 import type { ProfileRepository } from '../src/repositories/profile-repository';
+import type { DataEncryptionService } from '../src/utils/crypto';
+
+const encryption = { decrypt: vi.fn().mockResolvedValue({ fields: { fullName: 'Peer' } }) } as unknown as DataEncryptionService;
 
 describe('ConnectionService profile identifiers', () => {
   it('includes the peer username when listing connections', async () => {
@@ -12,72 +15,48 @@ describe('ConnectionService profile identifiers', () => {
           id: 'connection-id',
           requesterId: 'user-id',
           addresseeId: 'peer-id',
-          status: 'pending',
+          status: 'connected',
           requesterProfileSetId: 'profile-id',
-          addresseeProfileSetId: null,
-          requesterKeyEnvelope: {},
-          addresseeKeyEnvelope: null,
+          addresseeProfileSetId: 'profile-id',
           updatedAt: new Date(),
         },
       ]),
       findUsernames: vi
           .fn()
-          .mockResolvedValue([{ id: 'peer-id', username: 'peer.user', publicKey: 'peer-key' }]),
+          .mockResolvedValue([{ id: 'peer-id', username: 'peer.user' }]),
     } as unknown as ConnectionRepository;
     const service = new ConnectionService(
       repo,
-      { findById: vi.fn().mockResolvedValue({ clientId: 'client-profile-id' }) } as unknown as ProfileRepository,
+      { findById: vi.fn().mockResolvedValue({ ownerId: 'peer-id', clientId: 'client-profile-id', encryptedBlob: {}, version: 1, updatedAt: new Date() }) } as unknown as ProfileRepository,
       {} as NotificationService,
+      encryption,
     );
 
     await expect(service.list('user-id')).resolves.toMatchObject([
       {
         peerUserId: 'peer-id',
         peerUsername: 'peer.user',
-        peerPublicKey: 'peer-key',
         assignedProfileClientId: 'client-profile-id',
+        profile: { data: { fields: { fullName: 'Peer' } }, version: 1 },
       },
     ]);
-  });
-
-  it('notifies a peer when an encrypted profile key must be refreshed', async () => {
-    const connection = {
-      id: 'connection-id',
-      requesterId: 'user-id',
-      addresseeId: 'peer-id',
-      status: 'connected',
-    };
-    const repo = {
-      find: vi.fn().mockResolvedValue(connection),
-    } as unknown as ConnectionRepository;
-    const notifications = { send: vi.fn() } as unknown as NotificationService;
-    const service = new ConnectionService(repo, {} as ProfileRepository, notifications);
-
-    await service.update('user-id', 'connection-id', 'request_key_refresh');
-
-    expect(notifications.send).toHaveBeenCalledWith(
-      ['peer-id'],
-      'key_refresh_requested',
-      { connectionId: 'connection-id', userId: 'user-id' },
-    );
   });
 
   it('resolves the client profile id before creating a connection', async () => {
     const create = vi.fn().mockResolvedValue({ id: 'connection-id' });
     const repo = {
-      findUserKey: vi.fn().mockResolvedValue({ id: 'peer-id' }),
+      findUser: vi.fn().mockResolvedValue({ id: 'peer-id' }),
       findOwnedProfileByClientId: vi.fn().mockResolvedValue({ id: 'server-profile-id' }),
       findPair: vi.fn().mockResolvedValue(undefined),
       create,
     } as unknown as ConnectionRepository;
     const notifications = { send: vi.fn() } as unknown as NotificationService;
-    const service = new ConnectionService(repo, {} as ProfileRepository, notifications);
-    const envelope = { ephemeralPublicKey: 'key', nonce: 'nonce', ciphertext: 'ciphertext' };
+    const service = new ConnectionService(repo, {} as ProfileRepository, notifications, encryption);
 
-    await service.request('user-id', 'peer-id', 'client-profile-id', envelope);
+    await service.request('user-id', 'peer-id', 'client-profile-id');
 
     expect(repo.findOwnedProfileByClientId).toHaveBeenCalledWith('client-profile-id', 'user-id');
-    expect(create).toHaveBeenCalledWith('user-id', 'peer-id', 'server-profile-id', envelope);
+    expect(create).toHaveBeenCalledWith('user-id', 'peer-id', 'server-profile-id');
   });
 
   it('refreshes an existing connection without another acceptance', async () => {
@@ -90,23 +69,21 @@ describe('ConnectionService profile identifiers', () => {
     const update = vi.fn().mockResolvedValue({ ...existing, status: 'connected' });
     const create = vi.fn();
     const repo = {
-      findUserKey: vi.fn().mockResolvedValue({ id: 'peer-id' }),
+      findUser: vi.fn().mockResolvedValue({ id: 'peer-id' }),
       findOwnedProfileByClientId: vi.fn().mockResolvedValue({ id: 'server-profile-id' }),
       findPair: vi.fn().mockResolvedValue(existing),
       update,
       create,
     } as unknown as ConnectionRepository;
     const notifications = { send: vi.fn() } as unknown as NotificationService;
-    const service = new ConnectionService(repo, {} as ProfileRepository, notifications);
-    const envelope = { ephemeralPublicKey: 'key', nonce: 'nonce', ciphertext: 'ciphertext' };
+    const service = new ConnectionService(repo, {} as ProfileRepository, notifications, encryption);
 
-    await service.request('user-id', 'peer-id', 'client-profile-id', envelope);
+    await service.request('user-id', 'peer-id', 'client-profile-id');
 
     expect(create).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith('connection-id', {
       status: 'connected',
       requesterProfileSetId: 'server-profile-id',
-      requesterKeyEnvelope: envelope,
     });
     expect(notifications.send).toHaveBeenCalledWith(
       ['peer-id'],

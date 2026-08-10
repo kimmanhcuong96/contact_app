@@ -11,9 +11,6 @@ import { requireAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rate-limit';
 import { HttpError } from './utils/http-error';
 import { AuthRepository } from './repositories/auth-repository';
-import { ConnectionRepository } from './repositories/connection-repository';
-import { NotificationRepository } from './repositories/notification-repository';
-import { NotificationService } from './services/notification-service';
 
 export const app = new Hono<AppBindings>();
 
@@ -39,26 +36,6 @@ app.get('/v1/me', requireAuth, async (c) => {
   const user = await new AuthRepository(c.var.db).findUserById(c.var.userId);
   if (!user) throw new HttpError(404, 'User not found', 'not_found');
   return c.json({ id: user.id, username: user.username, recoveryEmail: user.recoveryEmail, status: user.status, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt });
-});
-app.put('/v1/me/key', requireAuth, async (c) => {
-  const body = await c.req.json<{ publicKey?: string }>();
-  if (!body.publicKey || body.publicKey.length < 20 || body.publicKey.length > 256) throw new HttpError(422, 'Invalid public key', 'validation_error');
-  const auth = new AuthRepository(c.var.db);
-  const existing = await auth.findUserById(c.var.userId);
-  await auth.updatePublicKey(c.var.userId, body.publicKey);
-  if (existing?.publicKey && existing.publicKey !== body.publicKey) {
-    const connections = new ConnectionRepository(c.var.db);
-    const rows = await connections.list(c.var.userId);
-    const peerIds = rows.map((row) => row.requesterId === c.var.userId ? row.addresseeId : row.requesterId);
-    await new NotificationService(new NotificationRepository(c.var.db), c.env)
-      .send(peerIds, 'identity_key_changed', { userId: c.var.userId });
-  }
-  return c.json({ ok: true });
-});
-app.get('/v1/users/:id/key', requireAuth, async (c) => {
-  const user = await new ConnectionRepository(c.var.db).findUserKey(c.req.param('id'));
-  if (!user?.publicKey) throw new HttpError(404, 'User key not found', 'not_found');
-  return c.json({ userId: user.id, publicKey: user.publicKey });
 });
 app.delete('/v1/me', requireAuth, async (c) => { await new AuthRepository(c.var.db).deleteUser(c.var.userId); return c.body(null, 204); });
 

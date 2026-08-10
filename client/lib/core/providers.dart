@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'database/app_database.dart';
 import 'localization/app_localizations.dart';
 import 'network/api_client.dart';
-import 'security/crypto_service.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/connection_repository.dart';
 import '../repositories/profile_repository.dart';
@@ -21,20 +20,19 @@ final databaseProvider = Provider((ref) {
 });
 final apiClientProvider =
     Provider((ref) => ApiClient(ref.watch(secureStorageProvider)));
-final cryptoProvider =
-    Provider((ref) => CryptoService(ref.watch(secureStorageProvider)));
-final authRepositoryProvider = Provider((ref) =>
-    AuthRepository(ref.watch(apiClientProvider), ref.watch(cryptoProvider)));
+final authRepositoryProvider =
+    Provider((ref) => AuthRepository(ref.watch(apiClientProvider)));
 final accountProvider = FutureProvider<Map<String, dynamic>>(
     (ref) => ref.watch(authRepositoryProvider).getAccount());
-final profileRepositoryProvider = Provider((ref) => ProfileRepository(
-    ref.watch(databaseProvider),
-    ref.watch(apiClientProvider),
-    ref.watch(cryptoProvider)));
+final profileRepositoryProvider = Provider((ref) {
+  final value = ProfileRepository(
+      ref.watch(databaseProvider), ref.watch(apiClientProvider));
+  ref.onDispose(value.dispose);
+  return value;
+});
 final connectionRepositoryProvider = Provider((ref) => ConnectionRepository(
     ref.watch(databaseProvider),
     ref.watch(apiClientProvider),
-    ref.watch(cryptoProvider),
     ref.watch(profileRepositoryProvider)));
 final syncServiceProvider = Provider((ref) {
   final value = SyncService(ref.watch(profileRepositoryProvider),

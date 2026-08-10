@@ -1,6 +1,6 @@
 name = "nexbook-api"
 main = "src/index.ts"
-compatibility_date = "2026-08-03"
+compatibility_date = "2026-08-10"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
@@ -8,6 +8,7 @@ APP_ORIGIN = "https://nexbook-web.pages.dev"
 ACCESS_TOKEN_TTL_SECONDS = "900"
 REFRESH_TOKEN_TTL_DAYS = "30"
 EMAIL_FROM = "NexBook <noreply@your-verified-domain.com>"
+DATA_ENCRYPTION_KEY_ID = "v1"
 
 [observability]
 enabled = true

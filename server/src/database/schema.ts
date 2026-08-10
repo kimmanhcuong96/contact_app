@@ -9,7 +9,6 @@ export const users = pgTable('users', {
   recoveryEmail: text('recovery_email').notNull().unique(),
   legacyEmailLogin: boolean('legacy_email_login').notNull().default(false),
   passwordHash: text('password_hash').notNull(),
-  publicKey: text('public_key'),
   status: userStatus('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
@@ -49,8 +48,6 @@ export const connections = pgTable('connections', {
   status: connectionStatus('status').notNull().default('pending'),
   requesterProfileSetId: uuid('requester_profile_set_id').references(() => profileSets.id, { onDelete: 'set null' }),
   addresseeProfileSetId: uuid('addressee_profile_set_id').references(() => profileSets.id, { onDelete: 'set null' }),
-  requesterKeyEnvelope: jsonb('requester_key_envelope'),
-  addresseeKeyEnvelope: jsonb('addressee_key_envelope'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({ pair: uniqueIndex('connections_pair').on(table.requesterId, table.addresseeId) }));
